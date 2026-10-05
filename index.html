@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Breach Solver</title>
+<style>
+  :root { --bg:#120e08; --ink:#ffe56a; --dim:#8a7340; --line:#f0d15a; --hot:#7dffe1; --ok:#b6ff6a; --bad:#ff6b4a; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:#120e08; color:var(--ink); font:15px/1.35 ui-monospace, Menlo, Consolas, monospace; }
+  header { padding:16px 16px 8px; border-bottom:1px solid #3d3118; }
+  header h1 { margin:0; font-size:18px; letter-spacing:.16em; }
+  header p { margin:6px 0 0; color:var(--dim); font-size:12px; }
+  main { padding:14px 16px 48px; max-width:760px; margin:0 auto; }
+  button, input, select { background:#1b150c; color:var(--ink); border:1px solid #6b5724; border-radius:4px; padding:10px 12px; font:inherit; }
+  button { cursor:pointer; letter-spacing:.06em; }
+  button.primary { border-color:var(--line); color:#fff3a8; }
+  .row { display:flex; gap:8px; flex-wrap:wrap; align-items:end; margin:10px 0; }
+  label { display:block; color:var(--dim); font-size:11px; letter-spacing:.08em; margin-bottom:4px; }
+  label.cam { display:inline-block; background:#3d3110; color:#fff3a8; border:1px solid var(--line); border-radius:4px; padding:10px 12px; letter-spacing:.06em; margin:0; font-size:15px; }
+  #file { position:absolute; left:-9999px; }
+  .stage { position:relative; width:100%; background:#000; border:1px solid #6b5724; overflow:hidden; touch-action:none; }
+  .stage img { width:100%; display:block; }
+  .box { position:absolute; border:2px solid var(--hot); background:rgba(125,255,225,.08); }
+  .box .tag { position:absolute; top:-18px; left:0; font-size:11px; color:var(--hot); }
+  .matrix { display:grid; grid-template-columns:repeat(5,1fr); gap:6px; margin:8px 0 12px; }
+  .matrix input, .seq input { width:100%; text-align:center; text-transform:uppercase; padding:10px 0; }
+  .seq { display:grid; grid-template-columns:18px repeat(4,1fr); gap:6px; align-items:center; margin-bottom:6px; }
+  .out { margin-top:14px; border:1px solid #6b5724; padding:12px; background:rgba(0,0,0,.35); }
+  .step { margin:8px 0; padding:8px; background:#241a0c; }
+  .step b { color:var(--hot); }
+  .hit { color:var(--ok); } .miss { color:var(--bad); } .note { color:var(--dim); font-size:12px; }
+  .path { letter-spacing:.12em; font-size:16px; }
+  #status { min-height:1.2em; color:var(--dim); font-size:12px; }
+</style>
+</head>
+<body>
+<header><h1>BREACH SOLVER</h1><p>Tap Open Camera. Drag the box over the matrix, read it, fix any miss, solve.</p></header>
+<main>
+  <div class="row">
+    <label class="cam" for="file">OPEN CAMERA</label>
+    <input id="file" type="file" accept="image/*" capture="environment" />
+    <button type="button" id="read" disabled>READ MATRIX</button>
+    <div><label>BUFFER</label><input id="buf" type="number" min="2" max="8" value="5" style="width:76px" /></div>
+  </div>
+  <div id="status">No photo yet.</div>
+  <div class="stage" id="stage" hidden>
+    <img id="shot" alt="Breach photo" />
+    <div class="box" id="box"><span class="tag">MATRIX</span></div>
+  </div>
+  <label>CODE MATRIX — tap a cell to cycle 1C / 55 / BD / E9</label>
+  <div id="matrix" class="matrix"></div>
+  <label>SEQUENCES</label>
+  <div id="seqs"></div>
+  <button type="button" class="primary" id="solve">SOLVE</button>
+  <div id="out" class="out note">Upload a photo or type the grid.</div>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<script>
+const CODES = ["1C","55","BD","E9","7A"];
+const matrixEl = document.getElementById("matrix");
+const seqsEl = document.getElementById("seqs");
+const out = document.getElementById("out");
+const shot = document.getElementById("shot");
+const stage = document.getElementById("stage");
+const box = document.getElementById("box");
+const statusEl = document.getElementById("status");
+let imgUrl = "";
+function cells() {
+  matrixEl.innerHTML = "";
+  for (let i = 0; i < 25; i++) {
+    const input = document.createElement("input");
+    input.maxLength = 2; input.placeholder = "00";
+    input.addEventListener("focus", () => cycle(input));
+    matrixEl.appendChild(input);
+  }
+}
+function cycle(input) {
+  const cur = input.value.trim().toUpperCase();
+  const i = CODES.indexOf(cur);
+  input.value = CODES[(i + 1) % CODES.length];
+}
+function buildSeqs() {
+  seqsEl.innerHTML = "";
+  for (let s = 0; s < 3; s++) {
+    const row = document.createElement("div");
+    row.className = "seq";
+    row.innerHTML = "<span>" + (s + 1) + "</span>";
+    for (let k = 0; k < 4; k++) {
+      const input = document.createElement("input");
+      input.maxLength = 2; input.placeholder = k ? "" : "opt";
+      row.appendChild(input);
+    }
+    seqsEl.appendChild(row);
+  }
+}
+cells(); buildSeqs();
+document.getElementById("file").onchange = (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  if (imgUrl) URL.revokeObjectURL(imgUrl);
+  imgUrl = URL.createObjectURL(file);
+  shot.src = imgUrl;
+  stage.hidden = false;
+  document.getElementById("read").disabled = false;
+  statusEl.textContent = "Drag the box onto the code matrix, then Read.";
+  shot.onload = () => placeBox();
+};
+function placeBox() {
+  const w = stage.clientWidth, h = shot.clientHeight;
+  box.style.left = (w * 0.08) + "px";
+  box.style.top = (h * 0.28) + "px";
+  box.style.width = (w * 0.52) + "px";
+  box.style.height = (h * 0.42) + "px";
+}
+let drag = null;
+box.addEventListener("pointerdown", (e) => {
+  const r = box.getBoundingClientRect();
+  drag = { x: e.clientX, y: e.clientY, l: box.offsetLeft, t: box.offsetTop, w: box.offsetWidth, h: box.offsetHeight, corner: e.clientX > r.right - 28 && e.clientY > r.bottom - 28 };
+  box.setPointerCapture(e.pointerId);
+});
+box.addEventListener("pointermove", (e) => {
+  if (!drag) return;
+  const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+  if (drag.corner) { box.style.width = Math.max(80, drag.w + dx) + "px"; box.style.height = Math.max(80, drag.h + dy) + "px"; }
+  else { box.style.left = drag.l + dx + "px"; box.style.top = drag.t + dy + "px"; }
+});
+box.addEventListener("pointerup", () => drag = null);
+function nearest(code) {
+  const c = code.replace(/[^0-9A-F]/g, "");
+  if (CODES.includes(c)) return c;
+  const map = { IC:"1C", LC:"1C", "1G":"1C", S5:"55", "5S":"55", "8D":"BD", B0:"BD", ED:"E9", F9:"E9", E8:"E9" };
+  if (map[c]) return map[c];
+  let best = "1C", score = 99;
+  for (const k of CODES) { const d = (c[0] !== k[0]) + (c[1] !== k[1]); if (d < score) { score = d; best = k; } }
+  return best;
+}
+async function readMatrix() {
+  statusEl.textContent = "Reading cells…";
+  const scaleX = shot.naturalWidth / shot.clientWidth, scaleY = shot.naturalHeight / shot.clientHeight;
+  const x = box.offsetLeft * scaleX, y = box.offsetTop * scaleY, w = box.offsetWidth * scaleX, h = box.offsetHeight * scaleY;
+  const canvas = document.createElement("canvas");
+  const ctx = canvas.getContext("2d");
+  const inputs = [...matrixEl.querySelectorAll("input")];
+  for (let i = 0; i < 25; i++) {
+    const r = Math.floor(i / 5), c = i % 5, pad = 0.12, cw = w / 5, ch = h / 5;
+    canvas.width = 120; canvas.height = 70;
+    ctx.fillStyle = "#000"; ctx.fillRect(0,0,120,70);
+    ctx.drawImage(shot, x + c * cw + cw * pad, y + r * ch + ch * pad, cw * (1 - pad * 2), ch * (1 - pad * 2), 0, 0, 120, 70);
+    const img = ctx.getImageData(0,0,120,70);
+    for (let p = 0; p < img.data.length; p += 4) {
+      const bright = img.data[p] * 0.4 + img.data[p+1] * 0.5 + img.data[p+2] * 0.1;
+      const on = bright > 90 ? 0 : 255;
+      img.data[p] = img.data[p+1] = img.data[p+2] = on;
+    }
+    ctx.putImageData(img, 0, 0);
+    const res = await Tesseract.recognize(canvas, "eng", { tessedit_char_whitelist: "0123456789ABCDEF" });
+    inputs[i].value = nearest((res.data.text || "").toUpperCase().replace(/\s/g, "").slice(0, 2));
+    statusEl.textContent = "Read " + (i + 1) + " / 25";
+  }
+  statusEl.textContent = "Check the grid. Tap a wrong cell to cycle it, then fill sequences and solve.";
+}
+document.getElementById("read").onclick = readMatrix;
+function readGrid() {
+  const vals = [...matrixEl.querySelectorAll("input")].map(i => i.value.trim().toUpperCase());
+  const grid = [];
+  for (let r = 0; r < 5; r++) grid.push(vals.slice(r * 5, r * 5 + 5));
+  return grid;
+}
+function readSeqs() {
+  return [...seqsEl.querySelectorAll(".seq")].map(row => [...row.querySelectorAll("input")].map(i => i.value.trim().toUpperCase()).filter(Boolean)).filter(s => s.length >= 2);
+}
+function contains(path, seq) {
+  for (let i = 0; i <= path.length - seq.length; i++) if (seq.every((c, k) => path[i + k] === c)) return true;
+  return false;
+}
+function solve() {
+  const grid = readGrid(), seqs = readSeqs(), buf = Number(document.getElementById("buf").value) || 5;
+  if (!seqs.length) return render("Add at least one sequence.", [], seqs);
+  if (grid.flat().some(c => !c)) return render("Fill every matrix cell.", [], seqs);
+  const stack = [];
+  for (let c = 0; c < 5; c++) stack.push([0, c, [[0, c]], "col"]);
+  const full = [], partial = [];
+  while (stack.length) {
+    const [r, c, path, axis] = stack.pop();
+    const codes = path.map(([rr, cc]) => grid[rr][cc]);
+    const hit = seqs.filter(s => contains(codes, s));
+    if (hit.length === seqs.length) { full.push({ codes, path }); if (full.length > 8) break; continue; }
+    if (hit.length) partial.push({ codes, path, hit });
+    if (path.length >= buf) continue;
+    const used = new Set(path.map(([rr, cc]) => rr + "," + cc));
+    if (axis === "col") { for (let nr = 0; nr < 5; nr++) if (nr !== r && !used.has(nr + "," + c)) stack.push([nr, c, path.concat([[nr, c]]), "row"]); }
+    else { for (let nc = 0; nc < 5; nc++) if (nc !== c && !used.has(r + "," + nc)) stack.push([r, nc, path.concat([[r, nc]]), "col"]); }
+  }
+  full.sort((a, b) => a.path.length - b.path.length);
+  if (full.length) return render("All " + seqs.length + " in " + full[0].path.length + " picks.", full.slice(0, 3), seqs);
+  partial.sort((a, b) => b.hit.length - a.hit.length || a.path.length - b.path.length);
+  const best = [], seen = new Set();
+  for (const p of partial) {
+    const key = p.hit.map(h => h.join(" ")).sort().join("|");
+    if (seen.has(key)) continue;
+    seen.add(key); best.push(p);
+    if (best.length === 3) break;
+  }
+  render("Not all sequences fit. Best partials:", best, seqs);
+}
+function render(title, solutions, seqs) {
+  if (!solutions.length) { out.innerHTML = "<div class=\"miss\">" + title + "</div>"; return; }
+  out.innerHTML = "<div>" + title + "</div>" + solutions.map(sol => {
+    const steps = sol.path.map(([r, c], i) => "<div class=\"step\"><b>" + (i + 1) + ".</b> R" + (r + 1) + " C" + (c + 1) + " — " + sol.codes[i] + "</div>").join("");
+    const covered = seqs.map(s => "<div class=\"" + (contains(sol.codes, s) ? "hit" : "miss") + "\">" + (contains(sol.codes, s) ? "HIT" : "MISS") + " " + s.join(" ") + "</div>").join("");
+    return "<div style=\"margin-top:12px\"><div class=\"path\">" + sol.codes.join(" ") + "</div>" + steps + covered + "</div>";
+  }).join("");
+}
+document.getElementById("solve").onclick = solve;
+</script>
+</body>
+</html>
