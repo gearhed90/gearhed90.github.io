@@ -173,19 +173,78 @@ function spawnTerrainFeatures() {
     new THREE.Color(p.rock).multiplyScalar(0.75),
     new THREE.Color(p.accent)
   ];
+  const crystalColors = [
+    new THREE.Color(0x70e0ff),
+    new THREE.Color(0xa0f0ff),
+    new THREE.Color(0x50c0e0)
+  ];
+  const debrisColors = [
+    new THREE.Color(0x5a6a7a),
+    new THREE.Color(0x8a7a6a),
+    new THREE.Color(0x6a5a4a)
+  ];
 
-  for (let i = 0; i < 12; i++) {
-    const size = 0.2 + Math.random() * 0.28;
+  // Small and medium rocks
+  for (let i = 0; i < 20; i++) {
+    const size = 0.15 + Math.random() * 0.35;
     const geo = new THREE.DodecahedronGeometry(size, 0);
     const rockMat = new THREE.MeshLambertMaterial({ color: rockColors[i % rockColors.length] });
     const rock = new THREE.Mesh(geo, rockMat);
-    const rx = (Math.random() - 0.5) * (WORLD_SIZE - 10);
-    const rz = (Math.random() - 0.5) * (WORLD_SIZE - 10);
-    rock.rotation.y = Math.random() * Math.PI;
+    const rx = (Math.random() - 0.5) * (WORLD_SIZE - 8);
+    const rz = (Math.random() - 0.5) * (WORLD_SIZE - 8);
+    rock.rotation.set(Math.random() * 0.4, Math.random() * Math.PI, Math.random() * 0.3);
     rock.castShadow = true;
     rock.receiveShadow = true;
     terrainGroup.add(rock);
-    placeOnGround(rock, rx, rz, -size);
+    placeOnGround(rock, rx, rz, -size * 0.6);
+  }
+
+  // Larger boulders
+  for (let i = 0; i < 6; i++) {
+    const size = 0.45 + Math.random() * 0.4;
+    const geo = new THREE.DodecahedronGeometry(size, 0);
+    const rockMat = new THREE.MeshLambertMaterial({ color: rockColors[i % rockColors.length] });
+    const rock = new THREE.Mesh(geo, rockMat);
+    const rx = (Math.random() - 0.5) * (WORLD_SIZE - 12);
+    const rz = (Math.random() - 0.5) * (WORLD_SIZE - 12);
+    rock.rotation.y = Math.random() * Math.PI;
+    rock.scale.y = 0.7 + Math.random() * 0.4;
+    rock.castShadow = true;
+    rock.receiveShadow = true;
+    terrainGroup.add(rock);
+    placeOnGround(rock, rx, rz, -size * 0.5);
+  }
+
+  // Crystal clusters
+  for (let i = 0; i < 8; i++) {
+    const cx = (Math.random() - 0.5) * (WORLD_SIZE - 10);
+    const cz = (Math.random() - 0.5) * (WORLD_SIZE - 10);
+    const count = 2 + Math.floor(Math.random() * 3);
+    for (let j = 0; j < count; j++) {
+      const h = 0.25 + Math.random() * 0.4;
+      const geo = new THREE.ConeGeometry(0.08 + Math.random() * 0.06, h, 5);
+      const mat = new THREE.MeshLambertMaterial({ color: crystalColors[j % crystalColors.length] });
+      const crystal = new THREE.Mesh(geo, mat);
+      const ox = (Math.random() - 0.5) * 0.4;
+      const oz = (Math.random() - 0.5) * 0.4;
+      crystal.rotation.z = (Math.random() - 0.5) * 0.3;
+      crystal.castShadow = true;
+      terrainGroup.add(crystal);
+      placeOnGround(crystal, cx + ox, cz + oz, -h * 0.5);
+    }
+  }
+
+  // Small debris / scrap
+  for (let i = 0; i < 10; i++) {
+    const geo = new THREE.BoxGeometry(0.12 + Math.random() * 0.15, 0.06, 0.1 + Math.random() * 0.12);
+    const mat = new THREE.MeshLambertMaterial({ color: debrisColors[i % debrisColors.length] });
+    const debris = new THREE.Mesh(geo, mat);
+    const dx = (Math.random() - 0.5) * (WORLD_SIZE - 8);
+    const dz = (Math.random() - 0.5) * (WORLD_SIZE - 8);
+    debris.rotation.y = Math.random() * Math.PI;
+    debris.castShadow = true;
+    terrainGroup.add(debris);
+    placeOnGround(debris, dx, dz, -0.03);
   }
 }
 
@@ -291,7 +350,6 @@ function makeChunkMesh(type) {
 }
 
 function refreshCarryStack() {
-  // Two columns, both can go tall
   carried.forEach((c, i) => {
     const col = i % 2;
     const row = Math.floor(i / 2);
