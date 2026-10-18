@@ -64,24 +64,22 @@ let lastTime = performance.now();
 let logTimeout;
 let terrainGroup = new THREE.Group();
 
-// Invisible joystick
 let joy = { active: false, startX: 0, startY: 0, id: null };
 const JOY_MAX = 70;
 const MOVE_SPEED = 6;
 
-// Height function matching ground displacement
+// Stronger height variation so hills are obvious
 function getHeight(x, z) {
-  return Math.sin(x * 0.25) * Math.cos(z * 0.22) * 0.55
-       + Math.sin(x * 0.08 + z * 0.1) * 0.4;
+  return Math.sin(x * 0.22) * Math.cos(z * 0.19) * 1.35
+       + Math.sin(x * 0.07 + z * 0.09) * 0.95;
 }
 
-// Three.js setup
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(planets[0].sky);
-scene.fog = new THREE.Fog(planets[0].sky, 14, 32);
+scene.fog = new THREE.Fog(planets[0].sky, 16, 36);
 
-const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 100);
-camera.position.set(0, 12, 14);
+const camera = new THREE.PerspectiveCamera(48, window.innerWidth / window.innerHeight, 0.1, 100);
+camera.position.set(0, 13, 15);
 camera.lookAt(0, 0, 0);
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -90,31 +88,29 @@ renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.shadowMap.enabled = true;
 document.body.appendChild(renderer.domElement);
 
-// Lights
-const ambient = new THREE.AmbientLight(0xffffff, 0.45);
+const ambient = new THREE.AmbientLight(0xffffff, 0.38);
 scene.add(ambient);
-const dir = new THREE.DirectionalLight(0xffffff, 0.9);
-dir.position.set(12, 20, 6);
+const dir = new THREE.DirectionalLight(0xffffff, 1.05);
+dir.position.set(8, 22, 4);
 dir.castShadow = true;
 dir.shadow.mapSize.width = 1024;
 dir.shadow.mapSize.height = 1024;
 scene.add(dir);
 
-// Ground with height variation + vertex colors for shading
 function createGround() {
-  const geo = new THREE.PlaneGeometry(WORLD_SIZE, WORLD_SIZE, 32, 32);
+  const geo = new THREE.PlaneGeometry(WORLD_SIZE, WORLD_SIZE, 40, 40);
   const pos = geo.attributes.position;
   const colors = [];
   const base = new THREE.Color(planets[0].ground);
-  const low = base.clone().multiplyScalar(0.75);
-  const high = base.clone().lerp(new THREE.Color(0xffffff), 0.25);
+  const low = base.clone().multiplyScalar(0.42);
+  const high = base.clone().lerp(new THREE.Color(0xffffff), 0.55);
 
   for (let i = 0; i < pos.count; i++) {
     const x = pos.getX(i);
     const y = pos.getY(i);
     const h = getHeight(x, y);
     pos.setZ(i, h);
-    const t = THREE.MathUtils.clamp((h + 0.6) / 1.2, 0, 1);
+    const t = THREE.MathUtils.clamp((h + 1.4) / 2.8, 0, 1);
     const c = low.clone().lerp(high, t);
     colors.push(c.r, c.g, c.b);
   }
@@ -143,31 +139,31 @@ function spawnTerrainFeatures() {
   clearTerrain();
   const p = planets[planetIndex];
   const rockMat = new THREE.MeshLambertMaterial({ color: p.rock });
-  const ridgeMat = new THREE.MeshLambertMaterial({ color: new THREE.Color(p.rock).multiplyScalar(0.8) });
+  const ridgeMat = new THREE.MeshLambertMaterial({ color: new THREE.Color(p.rock).multiplyScalar(0.75) });
 
-  for (let i = 0; i < 26; i++) {
-    const size = 0.28 + Math.random() * 0.55;
+  for (let i = 0; i < 22; i++) {
+    const size = 0.32 + Math.random() * 0.6;
     const geo = Math.random() < 0.5
       ? new THREE.DodecahedronGeometry(size, 0)
-      : new THREE.BoxGeometry(size * 1.3, size * 0.65, size * 1.0);
+      : new THREE.BoxGeometry(size * 1.25, size * 0.6, size * 0.95);
     const rock = new THREE.Mesh(geo, rockMat);
-    const rx = (Math.random() - 0.5) * (WORLD_SIZE - 5);
-    const rz = (Math.random() - 0.5) * (WORLD_SIZE - 5);
+    const rx = (Math.random() - 0.5) * (WORLD_SIZE - 6);
+    const rz = (Math.random() - 0.5) * (WORLD_SIZE - 6);
     const h = getHeight(rx, rz);
-    rock.position.set(rx, h + size * 0.35, rz);
+    rock.position.set(rx, h + size * 0.32, rz);
     rock.rotation.y = Math.random() * Math.PI;
     rock.castShadow = true;
     rock.receiveShadow = true;
     terrainGroup.add(rock);
   }
 
-  for (let i = 0; i < 5; i++) {
-    const geo = new THREE.CylinderGeometry(0.35 + Math.random() * 0.35, 0.9 + Math.random() * 0.5, 0.45 + Math.random() * 0.4, 5);
+  for (let i = 0; i < 4; i++) {
+    const geo = new THREE.CylinderGeometry(0.4 + Math.random() * 0.4, 1.0 + Math.random() * 0.5, 0.5 + Math.random() * 0.45, 5);
     const ridge = new THREE.Mesh(geo, ridgeMat);
-    const rx = (Math.random() - 0.5) * (WORLD_SIZE - 8);
-    const rz = (Math.random() - 0.5) * (WORLD_SIZE - 8);
+    const rx = (Math.random() - 0.5) * (WORLD_SIZE - 10);
+    const rz = (Math.random() - 0.5) * (WORLD_SIZE - 10);
     const h = getHeight(rx, rz);
-    ridge.position.set(rx, h + 0.15, rz);
+    ridge.position.set(rx, h + 0.12, rz);
     ridge.rotation.y = Math.random() * Math.PI;
     ridge.castShadow = true;
     ridge.receiveShadow = true;
@@ -175,7 +171,6 @@ function spawnTerrainFeatures() {
   }
 }
 
-// Low-poly pioneer
 const pioneerGroup = new THREE.Group();
 const bodyMat = new THREE.MeshLambertMaterial({ color: 0xe8f0ff });
 const visorMat = new THREE.MeshLambertMaterial({ color: 0x7ee0ff });
@@ -192,7 +187,6 @@ visor.position.set(0, 1.15, 0.22);
 pioneerGroup.add(visor);
 scene.add(pioneerGroup);
 
-// Materials for buildings and nodes
 const matExtractor = new THREE.MeshLambertMaterial({ color: 0x6a8aaa });
 const matSolar = new THREE.MeshLambertMaterial({ color: 0x7ee0ff });
 const matFactory = new THREE.MeshLambertMaterial({ color: 0x8a6a4a });
@@ -265,22 +259,20 @@ function updatePlanetVisuals() {
   const p = planets[planetIndex];
   scene.background = new THREE.Color(p.sky);
   scene.fog.color.set(p.sky);
-  // Rebuild ground colors for new planet
   scene.remove(ground);
   ground.geometry.dispose();
   ground.material.dispose();
   ground = createGround();
-  // Tint the base color into vertex colors by regenerating
   const pos = ground.geometry.attributes.position;
   const colors = [];
   const base = new THREE.Color(p.ground);
-  const low = base.clone().multiplyScalar(0.7);
-  const high = base.clone().lerp(new THREE.Color(0xffffff), 0.3);
+  const low = base.clone().multiplyScalar(0.4);
+  const high = base.clone().lerp(new THREE.Color(0xffffff), 0.6);
   for (let i = 0; i < pos.count; i++) {
     const x = pos.getX(i);
     const y = pos.getY(i);
     const h = getHeight(x, y);
-    const t = THREE.MathUtils.clamp((h + 0.6) / 1.2, 0, 1);
+    const t = THREE.MathUtils.clamp((h + 1.4) / 2.8, 0, 1);
     const c = low.clone().lerp(high, t);
     colors.push(c.r, c.g, c.b);
   }
@@ -401,7 +393,6 @@ function animate(now) {
   const dt = Math.min((now - lastTime) / 1000, 0.1);
   lastTime = now;
 
-  // Production
   let extractors = buildings.filter(b => b.type === 'extractor').length;
   let solars = buildings.filter(b => b.type === 'solar').length;
   let factories = buildings.filter(b => b.type === 'factory').length;
@@ -414,7 +405,6 @@ function animate(now) {
     resources.ice -= factories * 0.08 * dt;
   }
 
-  // Collect nodes
   nodes.forEach(n => {
     if (n.amount <= 0) return;
     const dx = pioneer.x - n.x;
@@ -433,7 +423,6 @@ function animate(now) {
     return false;
   });
 
-  // Movement
   pioneer.x += pioneer.vx * dt;
   pioneer.z += pioneer.vz * dt;
   if (!joy.active) {
@@ -444,18 +433,16 @@ function animate(now) {
   pioneer.x = Math.max(-half, Math.min(half, pioneer.x));
   pioneer.z = Math.max(-half, Math.min(half, pioneer.z));
 
-  // Update pioneer to sit on terrain
   const ph = getHeight(pioneer.x, pioneer.z);
   pioneerGroup.position.set(pioneer.x, ph, pioneer.z);
   if (Math.abs(pioneer.vx) + Math.abs(pioneer.vz) > 0.1) {
     pioneerGroup.rotation.y = Math.atan2(pioneer.vx, pioneer.vz);
   }
 
-  // Camera follow
   const camX = pioneer.x;
-  const camZ = pioneer.z + 10;
-  camera.position.lerp(new THREE.Vector3(camX, ph + 11, camZ), 0.08);
-  camera.lookAt(pioneer.x, ph + 0.5, pioneer.z);
+  const camZ = pioneer.z + 10.5;
+  camera.position.lerp(new THREE.Vector3(camX, ph + 12, camZ), 0.08);
+  camera.lookAt(pioneer.x, ph + 0.6, pioneer.z);
 
   updateUI();
   renderer.render(scene, camera);
@@ -516,7 +503,6 @@ window.addEventListener('resize', () => {
   renderer.setSize(window.innerWidth, window.innerHeight);
 });
 
-// Init
 spawnTerrainFeatures();
 spawnNodes();
 updateUI();
