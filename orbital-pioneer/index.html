@@ -50,10 +50,10 @@ import * as THREE from 'three';
 const WORLD_SIZE = 40;
 const MIN_BUILD_DIST = 1.8;
 const planets = [
-  { name: "Luna-1", ground: 0xc8d4e4, sky: 0x1e2838, rock: 0x8a929a, goal: { reg: 200, ice: 50 } },
-  { name: "Vesta Drift", ground: 0xe8c878, sky: 0x2e2618, rock: 0xc8a060, goal: { reg: 800, ice: 200, pwr: 100 } },
-  { name: "Ceres Hollow", ground: 0xa0c8f8, sky: 0x182838, rock: 0x70a0c8, goal: { reg: 3000, ice: 800, aly: 50 } },
-  { name: "Europa Rift", ground: 0x78e8f8, sky: 0x102830, rock: 0x58b0c0, goal: { reg: 12000, ice: 4000, aly: 300 } }
+  { name: "Luna-1", ground: 0xd0dce8, sky: 0x1e2838, rock: 0x7a828a, goal: { reg: 200, ice: 50 } },
+  { name: "Vesta Drift", ground: 0xf0d080, sky: 0x2e2618, rock: 0xd0a868, goal: { reg: 800, ice: 200, pwr: 100 } },
+  { name: "Ceres Hollow", ground: 0xb0d0ff, sky: 0x182838, rock: 0x60a0d0, goal: { reg: 3000, ice: 800, aly: 50 } },
+  { name: "Europa Rift", ground: 0x80f0ff, sky: 0x102830, rock: 0x50b0c8, goal: { reg: 12000, ice: 4000, aly: 300 } }
 ];
 let planetIndex = 0;
 let resources = { reg: 20, ice: 0, pwr: 0, aly: 0 };
@@ -88,10 +88,10 @@ renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 document.body.appendChild(renderer.domElement);
 
-const ambient = new THREE.AmbientLight(0xffffff, 0.55);
+const ambient = new THREE.AmbientLight(0xffffff, 0.6);
 scene.add(ambient);
-const dir = new THREE.DirectionalLight(0xfff0e0, 0.7);
-dir.position.set(10, 20, 8);
+const dir = new THREE.DirectionalLight(0xfff5e8, 0.65);
+dir.position.set(12, 22, 10);
 dir.castShadow = true;
 dir.shadow.mapSize.width = 2048;
 dir.shadow.mapSize.height = 2048;
@@ -101,32 +101,18 @@ dir.shadow.camera.left = -18;
 dir.shadow.camera.right = 18;
 dir.shadow.camera.top = 18;
 dir.shadow.camera.bottom = -18;
-dir.shadow.bias = -0.0005;
+dir.shadow.bias = -0.0004;
 scene.add(dir);
-const fill = new THREE.DirectionalLight(0xb0d0ff, 0.3);
-fill.position.set(-8, 10, -6);
+const fill = new THREE.DirectionalLight(0xc0d8ff, 0.35);
+fill.position.set(-10, 12, -8);
 scene.add(fill);
 const lightTarget = new THREE.Object3D();
 scene.add(lightTarget);
 dir.target = lightTarget;
 
-const raycaster = new THREE.Raycaster();
-const down = new THREE.Vector3(0, -1, 0);
-const rayOrigin = new THREE.Vector3();
-
-function sampleGroundY(x, z) {
-  rayOrigin.set(x, 30, z);
-  raycaster.set(rayOrigin, down);
-  const hits = raycaster.intersectObject(ground);
-  if (hits.length) return hits[0].point.y;
-  return getHeight(x, z);
-}
-
-// Place so the bottom of the object sits on the ground.
-// bottomOffset is how far below the object's local origin the bottom is.
-function placeOnGround(obj, x, z, bottomOffset) {
-  const h = sampleGroundY(x, z);
-  obj.position.set(x, h + bottomOffset, z);
+function placeOnGround(obj, x, z, sink) {
+  const h = getHeight(x, z);
+  obj.position.set(x, h - (sink || 0), z);
 }
 
 function createGround() {
@@ -134,9 +120,9 @@ function createGround() {
   const pos = geo.attributes.position;
   const colors = [];
   const base = new THREE.Color(planets[0].ground);
-  const low = base.clone().multiplyScalar(0.78);
-  const high = base.clone().lerp(new THREE.Color(0xffffff), 0.28);
-  const patch = base.clone().multiplyScalar(0.9);
+  const low = base.clone().multiplyScalar(0.82);
+  const high = base.clone().lerp(new THREE.Color(0xffffff), 0.22);
+  const patch = base.clone().multiplyScalar(0.92);
 
   for (let i = 0; i < pos.count; i++) {
     const x = pos.getX(i);
@@ -145,8 +131,8 @@ function createGround() {
     pos.setZ(i, h);
     const t = THREE.MathUtils.clamp((h + 1.6) / 3.2, 0, 1);
     let c = low.clone().lerp(high, t);
-    const noise = Math.sin(x * 0.25) * Math.cos(y * 0.2) * 0.5 + 0.5;
-    if (noise > 0.5) c.lerp(patch, (noise - 0.5) * 0.7);
+    const noise = Math.sin(x * 0.22) * Math.cos(y * 0.18) * 0.5 + 0.5;
+    if (noise > 0.48) c.lerp(patch, (noise - 0.48) * 0.6);
     colors.push(c.r, c.g, c.b);
   }
   geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
@@ -176,7 +162,7 @@ function spawnTerrainFeatures() {
   const rockMat = new THREE.MeshLambertMaterial({ color: p.rock });
 
   for (let i = 0; i < 10; i++) {
-    const size = 0.22 + Math.random() * 0.3;
+    const size = 0.2 + Math.random() * 0.25;
     const geo = new THREE.DodecahedronGeometry(size, 0);
     const rock = new THREE.Mesh(geo, rockMat);
     const rx = (Math.random() - 0.5) * (WORLD_SIZE - 10);
@@ -185,8 +171,7 @@ function spawnTerrainFeatures() {
     rock.castShadow = true;
     rock.receiveShadow = true;
     terrainGroup.add(rock);
-    // Dodecahedron is centered, bottom is at -size
-    placeOnGround(rock, rx, rz, size);
+    placeOnGround(rock, rx, rz, size * 0.15);
   }
 }
 
@@ -206,12 +191,12 @@ visor.position.set(0, 1.15, 0.22);
 pioneerGroup.add(visor);
 scene.add(pioneerGroup);
 
-const matBase = new THREE.MeshLambertMaterial({ color: 0x4a6a8a });
-const matAccent = new THREE.MeshLambertMaterial({ color: 0x70b0d0 });
-const matSolarPanel = new THREE.MeshLambertMaterial({ color: 0x40c8ff });
-const matFactory = new THREE.MeshLambertMaterial({ color: 0xb08060 });
-const matReg = new THREE.MeshLambertMaterial({ color: 0xd0dce8 });
-const matIce = new THREE.MeshLambertMaterial({ color: 0x60c8ff });
+const matBase = new THREE.MeshLambertMaterial({ color: 0x3a5a7a });
+const matAccent = new THREE.MeshLambertMaterial({ color: 0x60a0c0 });
+const matSolarPanel = new THREE.MeshLambertMaterial({ color: 0x30b8ff });
+const matFactory = new THREE.MeshLambertMaterial({ color: 0xc09070 });
+const matReg = new THREE.MeshLambertMaterial({ color: 0xe0e8f0 });
+const matIce = new THREE.MeshLambertMaterial({ color: 0x50c0ff });
 
 function createExtractor() {
   const g = new THREE.Group();
@@ -227,7 +212,6 @@ function createExtractor() {
   top.position.y = 1.05;
   top.castShadow = true;
   g.add(top);
-  g.userData.bottom = 0; // group origin is at ground
   return g;
 }
 function createSolar() {
@@ -244,7 +228,6 @@ function createSolar() {
   const stand = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.28, 0.08), matAccent);
   stand.position.y = 0.22;
   g.add(stand);
-  g.userData.bottom = 0;
   return g;
 }
 function createFactory() {
@@ -261,18 +244,17 @@ function createFactory() {
   chimney.position.set(0.25, 0.95, 0);
   chimney.castShadow = true;
   g.add(chimney);
-  g.userData.bottom = 0;
   return g;
 }
 function createNode(type) {
-  const size = type === 'reg' ? 0.32 : 0.38;
+  const size = type === 'reg' ? 0.3 : 0.36;
   const geo = type === 'reg'
     ? new THREE.DodecahedronGeometry(size, 0)
     : new THREE.OctahedronGeometry(size, 0);
   const mat = type === 'reg' ? matReg : matIce;
   const mesh = new THREE.Mesh(geo, mat);
   mesh.castShadow = true;
-  mesh.userData.bottom = size; // centered geometry
+  mesh.userData.sink = size * 0.2;
   return mesh;
 }
 
@@ -285,7 +267,7 @@ function spawnNodes() {
     const x = (Math.random() - 0.5) * (WORLD_SIZE - 6);
     const z = (Math.random() - 0.5) * (WORLD_SIZE - 6);
     scene.add(mesh);
-    placeOnGround(mesh, x, z, mesh.userData.bottom || 0);
+    placeOnGround(mesh, x, z, mesh.userData.sink || 0);
     nodes.push({ type, x, z, amount: 8 + Math.random() * 10, mesh });
   }
 }
@@ -301,17 +283,17 @@ function updatePlanetVisuals() {
   const pos = ground.geometry.attributes.position;
   const colors = [];
   const base = new THREE.Color(p.ground);
-  const low = base.clone().multiplyScalar(0.75);
-  const high = base.clone().lerp(new THREE.Color(0xffffff), 0.32);
-  const patch = base.clone().multiplyScalar(0.88);
+  const low = base.clone().multiplyScalar(0.8);
+  const high = base.clone().lerp(new THREE.Color(0xffffff), 0.25);
+  const patch = base.clone().multiplyScalar(0.9);
   for (let i = 0; i < pos.count; i++) {
     const x = pos.getX(i);
     const y = pos.getY(i);
     const h = getHeight(x, y);
     const t = THREE.MathUtils.clamp((h + 1.6) / 3.2, 0, 1);
     let c = low.clone().lerp(high, t);
-    const noise = Math.sin(x * 0.25) * Math.cos(y * 0.2) * 0.5 + 0.5;
-    if (noise > 0.5) c.lerp(patch, (noise - 0.5) * 0.7);
+    const noise = Math.sin(x * 0.22) * Math.cos(y * 0.18) * 0.5 + 0.5;
+    if (noise > 0.48) c.lerp(patch, (noise - 0.48) * 0.6);
     colors.push(c.r, c.g, c.b);
   }
   ground.geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
@@ -403,7 +385,7 @@ window.tryBuild = function(type) {
 
   if (mesh && costOk) {
     scene.add(mesh);
-    placeOnGround(mesh, spot.x, spot.z, mesh.userData.bottom || 0);
+    placeOnGround(mesh, spot.x, spot.z, 0);
     buildings.push({ type, mesh });
   }
   updateUI();
@@ -470,14 +452,14 @@ function animate(now) {
   pioneer.x = Math.max(-half, Math.min(half, pioneer.x));
   pioneer.z = Math.max(-half, Math.min(half, pioneer.z));
 
-  const ph = sampleGroundY(pioneer.x, pioneer.z);
+  const ph = getHeight(pioneer.x, pioneer.z);
   pioneerGroup.position.set(pioneer.x, ph, pioneer.z);
   if (Math.abs(pioneer.vx) + Math.abs(pioneer.vz) > 0.1) {
     pioneerGroup.rotation.y = Math.atan2(pioneer.vx, pioneer.vz);
   }
 
   lightTarget.position.set(pioneer.x, ph, pioneer.z);
-  dir.position.set(pioneer.x + 10, ph + 20, pioneer.z + 8);
+  dir.position.set(pioneer.x + 12, ph + 22, pioneer.z + 10);
   dir.shadow.camera.updateProjectionMatrix();
 
   const camX = pioneer.x;
