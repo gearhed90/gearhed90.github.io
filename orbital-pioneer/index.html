@@ -50,10 +50,10 @@ import * as THREE from 'three';
 const WORLD_SIZE = 40;
 const MIN_BUILD_DIST = 1.8;
 const planets = [
-  { name: "Luna-1", ground: 0xd0dce8, sky: 0x1e2838, rock: 0x7a828a, goal: { reg: 200, ice: 50 } },
-  { name: "Vesta Drift", ground: 0xf0d080, sky: 0x2e2618, rock: 0xd0a868, goal: { reg: 800, ice: 200, pwr: 100 } },
-  { name: "Ceres Hollow", ground: 0xb0d0ff, sky: 0x182838, rock: 0x60a0d0, goal: { reg: 3000, ice: 800, aly: 50 } },
-  { name: "Europa Rift", ground: 0x80f0ff, sky: 0x102830, rock: 0x50b0c8, goal: { reg: 12000, ice: 4000, aly: 300 } }
+  { name: "Luna-1", ground: 0xc8d4f0, sky: 0x1a2438, rock: 0x6a7480, accent: 0xa0b8d0, goal: { reg: 200, ice: 50 } },
+  { name: "Vesta Drift", ground: 0xf0c060, sky: 0x2a2010, rock: 0xc89040, accent: 0xe8a040, goal: { reg: 800, ice: 200, pwr: 100 } },
+  { name: "Ceres Hollow", ground: 0x90c8ff, sky: 0x142030, rock: 0x5090c0, accent: 0x70b0e0, goal: { reg: 3000, ice: 800, aly: 50 } },
+  { name: "Europa Rift", ground: 0x60e0f8, sky: 0x0c2030, rock: 0x40a0b8, accent: 0x50d0e0, goal: { reg: 12000, ice: 4000, aly: 300 } }
 ];
 let planetIndex = 0;
 let resources = { reg: 20, ice: 0, pwr: 0, aly: 0 };
@@ -88,10 +88,10 @@ renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 document.body.appendChild(renderer.domElement);
 
-const ambient = new THREE.AmbientLight(0xffffff, 0.6);
+const ambient = new THREE.AmbientLight(0xffffff, 0.55);
 scene.add(ambient);
-const dir = new THREE.DirectionalLight(0xfff5e8, 0.65);
-dir.position.set(12, 22, 10);
+const dir = new THREE.DirectionalLight(0xfff0d8, 0.75);
+dir.position.set(10, 20, 8);
 dir.castShadow = true;
 dir.shadow.mapSize.width = 2048;
 dir.shadow.mapSize.height = 2048;
@@ -103,36 +103,36 @@ dir.shadow.camera.top = 18;
 dir.shadow.camera.bottom = -18;
 dir.shadow.bias = -0.0004;
 scene.add(dir);
-const fill = new THREE.DirectionalLight(0xc0d8ff, 0.35);
-fill.position.set(-10, 12, -8);
+const fill = new THREE.DirectionalLight(0xb0d0ff, 0.3);
+fill.position.set(-8, 10, -6);
 scene.add(fill);
 const lightTarget = new THREE.Object3D();
 scene.add(lightTarget);
 dir.target = lightTarget;
 
-// Ground is a PlaneGeometry (XY) rotated -PI/2 around X.
-// After rotation, local (x, y) becomes world (x, height, -y).
-// So height must be computed from the world Z the vertex will have.
 function createGround() {
   const geo = new THREE.PlaneGeometry(WORLD_SIZE, WORLD_SIZE, 64, 64);
   const pos = geo.attributes.position;
   const colors = [];
-  const base = new THREE.Color(planets[0].ground);
-  const low = base.clone().multiplyScalar(0.82);
-  const high = base.clone().lerp(new THREE.Color(0xffffff), 0.22);
-  const patch = base.clone().multiplyScalar(0.92);
+  const p = planets[planetIndex];
+  const base = new THREE.Color(p.ground);
+  const low = base.clone().multiplyScalar(0.7);
+  const high = base.clone().lerp(new THREE.Color(0xffffff), 0.4);
+  const patch1 = new THREE.Color(p.accent);
+  const patch2 = base.clone().lerp(new THREE.Color(0x888888), 0.35);
 
   for (let i = 0; i < pos.count; i++) {
     const x = pos.getX(i);
     const y = pos.getY(i);
-    // After rotation.x = -PI/2 this vertex is at world (x, h, -y)
     const worldZ = -y;
     const h = getHeight(x, worldZ);
     pos.setZ(i, h);
     const t = THREE.MathUtils.clamp((h + 1.6) / 3.2, 0, 1);
     let c = low.clone().lerp(high, t);
-    const noise = Math.sin(x * 0.22) * Math.cos(worldZ * 0.18) * 0.5 + 0.5;
-    if (noise > 0.48) c.lerp(patch, (noise - 0.48) * 0.6);
+    const n1 = Math.sin(x * 0.18) * Math.cos(worldZ * 0.15) * 0.5 + 0.5;
+    const n2 = Math.sin(x * 0.07 + worldZ * 0.09) * 0.5 + 0.5;
+    if (n1 > 0.55) c.lerp(patch1, (n1 - 0.55) * 1.4);
+    if (n2 > 0.62) c.lerp(patch2, (n2 - 0.62) * 1.2);
     colors.push(c.r, c.g, c.b);
   }
   geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
@@ -148,7 +148,6 @@ scene.add(ground);
 scene.add(terrainGroup);
 
 function placeOnGround(obj, x, z, bottomY) {
-  // bottomY is the local Y of the object's bottom relative to its origin
   const h = getHeight(x, z);
   obj.position.set(x, h - bottomY, z);
 }
@@ -165,11 +164,16 @@ function clearTerrain() {
 function spawnTerrainFeatures() {
   clearTerrain();
   const p = planets[planetIndex];
-  const rockMat = new THREE.MeshLambertMaterial({ color: p.rock });
+  const rockColors = [
+    new THREE.Color(p.rock),
+    new THREE.Color(p.rock).multiplyScalar(0.75),
+    new THREE.Color(p.accent)
+  ];
 
-  for (let i = 0; i < 10; i++) {
-    const size = 0.2 + Math.random() * 0.25;
+  for (let i = 0; i < 12; i++) {
+    const size = 0.2 + Math.random() * 0.28;
     const geo = new THREE.DodecahedronGeometry(size, 0);
+    const rockMat = new THREE.MeshLambertMaterial({ color: rockColors[i % rockColors.length] });
     const rock = new THREE.Mesh(geo, rockMat);
     const rx = (Math.random() - 0.5) * (WORLD_SIZE - 10);
     const rz = (Math.random() - 0.5) * (WORLD_SIZE - 10);
@@ -177,7 +181,6 @@ function spawnTerrainFeatures() {
     rock.castShadow = true;
     rock.receiveShadow = true;
     terrainGroup.add(rock);
-    // Dodecahedron is centered; bottom is at -size
     placeOnGround(rock, rx, rz, -size);
   }
 }
@@ -198,12 +201,12 @@ visor.position.set(0, 1.15, 0.22);
 pioneerGroup.add(visor);
 scene.add(pioneerGroup);
 
-const matBase = new THREE.MeshLambertMaterial({ color: 0x3a5a7a });
-const matAccent = new THREE.MeshLambertMaterial({ color: 0x60a0c0 });
-const matSolarPanel = new THREE.MeshLambertMaterial({ color: 0x30b8ff });
-const matFactory = new THREE.MeshLambertMaterial({ color: 0xc09070 });
-const matReg = new THREE.MeshLambertMaterial({ color: 0xe0e8f0 });
-const matIce = new THREE.MeshLambertMaterial({ color: 0x50c0ff });
+const matBase = new THREE.MeshLambertMaterial({ color: 0x4a7a9a });
+const matAccent = new THREE.MeshLambertMaterial({ color: 0x70c0e0 });
+const matSolarPanel = new THREE.MeshLambertMaterial({ color: 0x40d0ff });
+const matFactory = new THREE.MeshLambertMaterial({ color: 0xd09060 });
+const matReg = new THREE.MeshLambertMaterial({ color: 0xe8f0ff });
+const matIce = new THREE.MeshLambertMaterial({ color: 0x60d0ff });
 
 function createExtractor() {
   const g = new THREE.Group();
@@ -290,24 +293,6 @@ function updatePlanetVisuals() {
   ground.geometry.dispose();
   ground.material.dispose();
   ground = createGround();
-  const pos = ground.geometry.attributes.position;
-  const colors = [];
-  const base = new THREE.Color(p.ground);
-  const low = base.clone().multiplyScalar(0.8);
-  const high = base.clone().lerp(new THREE.Color(0xffffff), 0.25);
-  const patch = base.clone().multiplyScalar(0.9);
-  for (let i = 0; i < pos.count; i++) {
-    const x = pos.getX(i);
-    const y = pos.getY(i);
-    const worldZ = -y;
-    const h = getHeight(x, worldZ);
-    const t = THREE.MathUtils.clamp((h + 1.6) / 3.2, 0, 1);
-    let c = low.clone().lerp(high, t);
-    const noise = Math.sin(x * 0.22) * Math.cos(worldZ * 0.18) * 0.5 + 0.5;
-    if (noise > 0.48) c.lerp(patch, (noise - 0.48) * 0.6);
-    colors.push(c.r, c.g, c.b);
-  }
-  ground.geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
   scene.add(ground);
   spawnTerrainFeatures();
 }
@@ -470,7 +455,7 @@ function animate(now) {
   }
 
   lightTarget.position.set(pioneer.x, ph, pioneer.z);
-  dir.position.set(pioneer.x + 12, ph + 22, pioneer.z + 10);
+  dir.position.set(pioneer.x + 10, ph + 20, pioneer.z + 8);
   dir.shadow.camera.updateProjectionMatrix();
 
   const camX = pioneer.x;
