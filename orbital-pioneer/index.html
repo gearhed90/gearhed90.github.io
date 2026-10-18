@@ -110,6 +110,7 @@ dir.target = lightTarget;
 const raycaster = new THREE.Raycaster();
 const down = new THREE.Vector3(0, -1, 0);
 const rayOrigin = new THREE.Vector3();
+const box = new THREE.Box3();
 
 function sampleGroundY(x, z) {
   rayOrigin.set(x, 30, z);
@@ -117,6 +118,13 @@ function sampleGroundY(x, z) {
   const hits = raycaster.intersectObject(ground);
   if (hits.length) return hits[0].point.y;
   return getHeight(x, z);
+}
+
+function placeOnGround(obj, x, z) {
+  const h = sampleGroundY(x, z);
+  box.setFromObject(obj);
+  const bottom = box.min.y;
+  obj.position.set(x, h - bottom, z);
 }
 
 function createGround() {
@@ -135,7 +143,6 @@ function createGround() {
     pos.setZ(i, h);
     const t = THREE.MathUtils.clamp((h + 2.0) / 4.0, 0, 1);
     let c = low.clone().lerp(high, t);
-    // Extra color patches
     const noise = Math.sin(x * 0.35) * Math.cos(y * 0.28) * 0.5 + 0.5;
     if (noise > 0.62) c.lerp(patch, (noise - 0.62) * 1.8);
     colors.push(c.r, c.g, c.b);
@@ -174,13 +181,11 @@ function spawnTerrainFeatures() {
     const rock = new THREE.Mesh(geo, rockMat);
     const rx = (Math.random() - 0.5) * (WORLD_SIZE - 8);
     const rz = (Math.random() - 0.5) * (WORLD_SIZE - 8);
-    const h = sampleGroundY(rx, rz);
-    // Geometry is centered, so lift by half height
-    rock.position.set(rx, h + size * 0.18, rz);
     rock.rotation.y = Math.random() * Math.PI;
     rock.castShadow = true;
     rock.receiveShadow = true;
     terrainGroup.add(rock);
+    placeOnGround(rock, rx, rz);
   }
 }
 
@@ -261,9 +266,8 @@ function spawnNodes() {
     const mesh = createNode(type);
     const x = (Math.random() - 0.5) * (WORLD_SIZE - 6);
     const z = (Math.random() - 0.5) * (WORLD_SIZE - 6);
-    const h = sampleGroundY(x, z);
-    mesh.position.set(x, h + 0.15, z);
     scene.add(mesh);
+    placeOnGround(mesh, x, z);
     nodes.push({ type, x, z, amount: 8 + Math.random() * 10, mesh });
   }
 }
@@ -380,9 +384,8 @@ window.tryBuild = function(type) {
   }
 
   if (mesh && costOk) {
-    const h = sampleGroundY(spot.x, spot.z);
-    mesh.position.set(spot.x, h, spot.z);
     scene.add(mesh);
+    placeOnGround(mesh, spot.x, spot.z);
     buildings.push({ type, mesh });
   }
   updateUI();
@@ -450,7 +453,7 @@ function animate(now) {
   pioneer.z = Math.max(-half, Math.min(half, pioneer.z));
 
   const ph = sampleGroundY(pioneer.x, pioneer.z);
-  pioneerGroup.position.set(pioneer.x, ph + 0.01, pioneer.z);
+  pioneerGroup.position.set(pioneer.x, ph, pioneer.z);
   if (Math.abs(pioneer.vx) + Math.abs(pioneer.vz) > 0.1) {
     pioneerGroup.rotation.y = Math.atan2(pioneer.vx, pioneer.vz);
   }
