@@ -8,36 +8,36 @@
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { background: #0a0e17; color: #e8f0ff; font-family: system-ui, -apple-system, sans-serif; overflow: hidden; touch-action: none; }
-#ui { position: fixed; top: 0; left: 0; right: 0; padding: 8px 12px; background: rgba(10,14,23,0.85); backdrop-filter: blur(6px); z-index: 10; display: flex; justify-content: space-between; align-items: center; font-size: 14px; }
+#ui { position: fixed; top: 0; left: 0; right: 0; padding: 8px 12px; background: rgba(10,14,23,0.85); backdrop-filter: blur(6px); z-index: 10; display: flex; justify-content: space-between; align-items: center; font-size: 14px; flex-wrap: wrap; }
 #planetName { font-weight: 600; color: #7ee0ff; }
-#resources { display: flex; gap: 16px; }
-.res { display: flex; align-items: center; gap: 4px; }
+#resources { display: flex; gap: 12px; flex-wrap: wrap; }
+.res { display: flex; align-items: center; gap: 4px; font-size: 13px; }
 .res span { color: #a0c8ff; }
 #canvas { display: block; width: 100vw; height: 100vh; background: #12182a; }
-#buildPanel { position: fixed; bottom: 0; left: 0; right: 0; background: rgba(10,14,23,0.92); padding: 12px; z-index: 10; display: flex; gap: 8px; overflow-x: auto; }
-.buildBtn { background: #1a2744; border: 1px solid #3a5a8a; color: #e8f0ff; padding: 10px 14px; border-radius: 8px; font-size: 13px; white-space: nowrap; cursor: pointer; min-width: 120px; }
-.buildBtn:disabled { opacity: 0.4; }
+#buildPanel { position: fixed; bottom: 0; left: 0; right: 0; background: rgba(10,14,23,0.92); padding: 10px 8px; z-index: 10; display: flex; gap: 6px; overflow-x: auto; }
+.buildBtn { background: #1a2744; border: 1px solid #3a5a8a; color: #e8f0ff; padding: 8px 10px; border-radius: 8px; font-size: 12px; cursor: pointer; min-width: 90px; white-space: normal; text-align: center; line-height: 1.2; }
+.buildBtn:disabled { opacity: 0.45; }
 .buildBtn:active { background: #2a3f6a; }
-#log { position: fixed; top: 50px; left: 12px; font-size: 12px; color: #88aacc; pointer-events: none; max-width: 60%; }
+#log { position: fixed; top: 52px; left: 12px; font-size: 12px; color: #88aacc; pointer-events: none; max-width: 70%; }
 </style>
 </head>
 <body>
 <div id="ui">
   <div id="planetName">Luna-1</div>
   <div id="resources">
-    <div class="res">Regolith: <span id="reg">0</span></div>
+    <div class="res">Reg: <span id="reg">0</span></div>
     <div class="res">Ice: <span id="ice">0</span></div>
-    <div class="res">Power: <span id="pwr">0</span></div>
-    <div class="res">Alloy: <span id="aly">0</span></div>
+    <div class="res">Pwr: <span id="pwr">0</span></div>
+    <div class="res">Aly: <span id="aly">0</span></div>
   </div>
 </div>
 <canvas id="canvas"></canvas>
 <div id="log"></div>
 <div id="buildPanel">
-  <button class="buildBtn" id="btnExtractor" onclick="tryBuild('extractor')">Extractor (10 Reg)</button>
-  <button class="buildBtn" id="btnSolar" onclick="tryBuild('solar')">Solar Array (20 Reg + 5 Ice)</button>
-  <button class="buildBtn" id="btnFactory" onclick="tryBuild('factory')">Alloy Foundry (50 Reg + 20 Ice + 30 Pwr)</button>
-  <button class="buildBtn" id="btnLaunch" onclick="tryLaunch()">Launch to Next Planet</button>
+  <button class="buildBtn" id="btnExtractor" onclick="tryBuild('extractor')">Extractor<br>10 Reg</button>
+  <button class="buildBtn" id="btnSolar" onclick="tryBuild('solar')">Solar<br>20R+5I</button>
+  <button class="buildBtn" id="btnFactory" onclick="tryBuild('factory')">Foundry<br>50R 20I 30P</button>
+  <button class="buildBtn" id="btnLaunch" onclick="tryLaunch()">Launch</button>
 </div>
 <script>
 const canvas = document.getElementById('canvas');
@@ -46,6 +46,8 @@ let W, H;
 function resize() { W = canvas.width = window.innerWidth; H = canvas.height = window.innerHeight; }
 window.addEventListener('resize', resize); resize();
 
+const WORLD_W = 2400;
+const WORLD_H = 1600;
 const planets = [
   { name: "Luna-1", color: "#c8d0e0", bg: "#1a2030", goal: { reg: 200, ice: 50 } },
   { name: "Vesta Drift", color: "#e8c878", bg: "#2a2218", goal: { reg: 800, ice: 200, pwr: 100 } },
@@ -53,17 +55,31 @@ const planets = [
   { name: "Europa Rift", color: "#88e8ff", bg: "#102028", goal: { reg: 12000, ice: 4000, aly: 300 } }
 ];
 let planetIndex = 0;
-let resources = { reg: 0, ice: 0, pwr: 0, aly: 0 };
+let resources = { reg: 20, ice: 0, pwr: 0, aly: 0 }; // start with enough for first extractor
 let buildings = [];
-let pioneer = { x: 0, y: 0, vx: 0, vy: 0 };
+let nodes = [];
+let pioneer = { x: WORLD_W/2, y: WORLD_H/2, vx: 0, vy: 0 };
+let camera = { x: 0, y: 0 };
 let lastTime = performance.now();
 let logTimeout;
+
+function spawnNodes() {
+  nodes = [];
+  for (let i = 0; i < 12; i++) {
+    nodes.push({
+      type: Math.random() < 0.6 ? 'reg' : 'ice',
+      x: Math.random() * (WORLD_W - 200) + 100,
+      y: Math.random() * (WORLD_H - 200) + 100,
+      amount: 8 + Math.random() * 12
+    });
+  }
+}
 
 function log(msg) {
   const el = document.getElementById('log');
   el.textContent = msg;
   clearTimeout(logTimeout);
-  logTimeout = setTimeout(() => el.textContent = '', 3000);
+  logTimeout = setTimeout(() => el.textContent = '', 2500);
 }
 
 function updateUI() {
@@ -78,22 +94,24 @@ function updateUI() {
   const g = planets[planetIndex].goal;
   const canLaunch = resources.reg >= (g.reg||0) && resources.ice >= (g.ice||0) && resources.pwr >= (g.pwr||0) && resources.aly >= (g.aly||0);
   document.getElementById('btnLaunch').disabled = !canLaunch || planetIndex >= planets.length - 1;
-  document.getElementById('btnLaunch').textContent = planetIndex >= planets.length - 1 ? "Final Planet" : "Launch to Next Planet";
+  document.getElementById('btnLaunch').textContent = planetIndex >= planets.length - 1 ? "Final" : "Launch";
 }
 
 function tryBuild(type) {
+  const px = pioneer.x;
+  const py = pioneer.y;
   if (type === 'extractor' && resources.reg >= 10) {
     resources.reg -= 10;
-    buildings.push({ type: 'extractor', x: Math.random()*W*0.6 + W*0.2, y: Math.random()*H*0.5 + H*0.25 });
-    log("Extractor online");
+    buildings.push({ type: 'extractor', x: px + (Math.random()-0.5)*80, y: py + 40 });
+    log("Extractor built");
   } else if (type === 'solar' && resources.reg >= 20 && resources.ice >= 5) {
     resources.reg -= 20; resources.ice -= 5;
-    buildings.push({ type: 'solar', x: Math.random()*W*0.6 + W*0.2, y: Math.random()*H*0.5 + H*0.25 });
+    buildings.push({ type: 'solar', x: px + (Math.random()-0.5)*80, y: py + 40 });
     log("Solar array deployed");
   } else if (type === 'factory' && resources.reg >= 50 && resources.ice >= 20 && resources.pwr >= 30) {
     resources.reg -= 50; resources.ice -= 20; resources.pwr -= 30;
-    buildings.push({ type: 'factory', x: Math.random()*W*0.6 + W*0.2, y: Math.random()*H*0.5 + H*0.25 });
-    log("Alloy foundry active");
+    buildings.push({ type: 'factory', x: px + (Math.random()-0.5)*80, y: py + 40 });
+    log("Foundry online");
   }
   updateUI();
 }
@@ -104,8 +122,10 @@ function tryLaunch() {
   if (resources.reg >= (g.reg||0) && resources.ice >= (g.ice||0) && resources.pwr >= (g.pwr||0) && resources.aly >= (g.aly||0)) {
     planetIndex++;
     buildings = [];
-    pioneer.x = W/2; pioneer.y = H/2;
-    log("Transfer complete. Welcome to " + planets[planetIndex].name);
+    pioneer.x = WORLD_W/2;
+    pioneer.y = WORLD_H/2;
+    spawnNodes();
+    log("Welcome to " + planets[planetIndex].name);
     updateUI();
   }
 }
@@ -118,33 +138,70 @@ function loop(now) {
   let extractors = buildings.filter(b => b.type === 'extractor').length;
   let solars = buildings.filter(b => b.type === 'solar').length;
   let factories = buildings.filter(b => b.type === 'factory').length;
-  resources.reg += extractors * 0.8 * dt;
-  resources.ice += extractors * 0.2 * dt;
-  resources.pwr += solars * 1.5 * dt;
-  if (factories > 0 && resources.pwr > 1 && resources.ice > 0.5) {
-    resources.aly += factories * 0.15 * dt;
-    resources.pwr -= factories * 0.3 * dt;
-    resources.ice -= factories * 0.1 * dt;
+  resources.reg += extractors * 0.7 * dt;
+  resources.ice += extractors * 0.15 * dt;
+  resources.pwr += solars * 1.2 * dt;
+  if (factories > 0 && resources.pwr > 1 && resources.ice > 0.4) {
+    resources.aly += factories * 0.12 * dt;
+    resources.pwr -= factories * 0.25 * dt;
+    resources.ice -= factories * 0.08 * dt;
   }
 
-  // Pioneer drifts slowly toward center-ish if no input
+  // Collect nearby nodes
+  nodes.forEach(n => {
+    if (n.amount <= 0) return;
+    const dx = pioneer.x - n.x;
+    const dy = pioneer.y - n.y;
+    if (Math.hypot(dx, dy) < 28) {
+      const take = Math.min(n.amount, 4 * dt);
+      n.amount -= take;
+      if (n.type === 'reg') resources.reg += take;
+      else resources.ice += take;
+    }
+  });
+  nodes = nodes.filter(n => n.amount > 0.5);
+
+  // Pioneer movement
   pioneer.x += pioneer.vx * dt;
   pioneer.y += pioneer.vy * dt;
-  pioneer.vx *= 0.95;
-  pioneer.vy *= 0.95;
-  pioneer.x = Math.max(40, Math.min(W-40, pioneer.x));
-  pioneer.y = Math.max(80, Math.min(H-120, pioneer.y));
+  pioneer.vx *= 0.94;
+  pioneer.vy *= 0.94;
+  pioneer.x = Math.max(30, Math.min(WORLD_W-30, pioneer.x));
+  pioneer.y = Math.max(30, Math.min(WORLD_H-30, pioneer.y));
+
+  // Camera follows pioneer
+  camera.x = pioneer.x - W/2;
+  camera.y = pioneer.y - H/2;
+  camera.x = Math.max(0, Math.min(WORLD_W - W, camera.x));
+  camera.y = Math.max(0, Math.min(WORLD_H - H, camera.y));
 
   // Draw
   const p = planets[planetIndex];
   ctx.fillStyle = p.bg;
   ctx.fillRect(0, 0, W, H);
 
-  // Ground
+  ctx.save();
+  ctx.translate(-camera.x, -camera.y);
+
+  // Ground patches
   ctx.fillStyle = p.color;
-  ctx.globalAlpha = 0.15;
-  ctx.fillRect(0, H*0.65, W, H*0.35);
+  ctx.globalAlpha = 0.12;
+  for (let i = 0; i < 40; i++) {
+    const gx = (i * 173) % WORLD_W;
+    const gy = (i * 251) % WORLD_H;
+    ctx.fillRect(gx, gy, 80 + (i%5)*20, 40 + (i%3)*15);
+  }
   ctx.globalAlpha = 1;
+
+  // Resource nodes
+  nodes.forEach(n => {
+    ctx.fillStyle = n.type === 'reg' ? '#b8c4d0' : '#88d0ff';
+    ctx.beginPath();
+    ctx.arc(n.x, n.y, 8, 0, Math.PI*2);
+    ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.4)';
+    ctx.fillRect(n.x-6, n.y-14, Math.max(2, n.amount/2), 3);
+  });
 
   // Buildings
   buildings.forEach(b => {
@@ -152,19 +209,19 @@ function loop(now) {
     ctx.translate(b.x, b.y);
     if (b.type === 'extractor') {
       ctx.fillStyle = '#6a8aaa';
-      ctx.fillRect(-12, -20, 24, 20);
+      ctx.fillRect(-12, -18, 24, 18);
       ctx.fillStyle = '#88aacc';
-      ctx.fillRect(-6, -28, 12, 10);
+      ctx.fillRect(-6, -26, 12, 10);
     } else if (b.type === 'solar') {
       ctx.fillStyle = '#3a5a8a';
-      ctx.fillRect(-18, -8, 36, 8);
+      ctx.fillRect(-16, -6, 32, 6);
       ctx.fillStyle = '#7ee0ff';
-      ctx.fillRect(-16, -18, 32, 10);
+      ctx.fillRect(-14, -16, 28, 10);
     } else if (b.type === 'factory') {
       ctx.fillStyle = '#8a6a4a';
-      ctx.fillRect(-16, -24, 32, 24);
+      ctx.fillRect(-14, -20, 28, 20);
       ctx.fillStyle = '#ffaa66';
-      ctx.fillRect(-4, -36, 8, 14);
+      ctx.fillRect(-3, -30, 6, 12);
     }
     ctx.restore();
   });
@@ -177,42 +234,53 @@ function loop(now) {
   ctx.fillStyle = '#7ee0ff';
   ctx.fillRect(pioneer.x-4, pioneer.y-16, 8, 8);
 
+  ctx.restore();
+
   updateUI();
   requestAnimationFrame(loop);
 }
 
 function handlePointer(e) {
+  e.preventDefault();
   const rect = canvas.getBoundingClientRect();
-  const x = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
-  const y = (e.touches ? e.touches[0].clientY : e.clientY) - rect.top;
-  const dx = x - pioneer.x;
-  const dy = y - pioneer.y;
+  const sx = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
+  const sy = (e.touches ? e.touches[0].clientY : e.clientY) - rect.top;
+  const wx = sx + camera.x;
+  const wy = sy + camera.y;
+  const dx = wx - pioneer.x;
+  const dy = wy - pioneer.y;
   const dist = Math.hypot(dx, dy) || 1;
-  pioneer.vx = (dx / dist) * 180;
-  pioneer.vy = (dy / dist) * 180;
+  pioneer.vx = (dx / dist) * 220;
+  pioneer.vy = (dy / dist) * 220;
 }
 
 canvas.addEventListener('pointerdown', handlePointer);
-canvas.addEventListener('touchstart', handlePointer, { passive: true });
+canvas.addEventListener('touchstart', handlePointer, { passive: false });
 
 // Init
-pioneer.x = W/2; pioneer.y = H*0.55;
+spawnNodes();
 updateUI();
 requestAnimationFrame(loop);
 
-// Load/save
 function save() {
-  localStorage.setItem('orbitalPioneer', JSON.stringify({ resources, planetIndex, buildings: buildings.map(b => ({type:b.type})) }));
+  localStorage.setItem('orbitalPioneer', JSON.stringify({
+    resources, planetIndex,
+    buildings: buildings.map(b => ({type:b.type, x:b.x, y:b.y})),
+    pioneer: {x: pioneer.x, y: pioneer.y}
+  }));
 }
 function load() {
   try {
     const d = JSON.parse(localStorage.getItem('orbitalPioneer') || '{}');
     if (d.resources) resources = d.resources;
-    if (d.planetIndex) planetIndex = d.planetIndex;
+    if (typeof d.planetIndex === 'number') planetIndex = d.planetIndex;
+    if (d.buildings) buildings = d.buildings;
+    if (d.pioneer) { pioneer.x = d.pioneer.x; pioneer.y = d.pioneer.y; }
   } catch(e) {}
 }
 load();
-setInterval(save, 5000);
+if (!buildings.length && resources.reg < 5) resources.reg = 20;
+setInterval(save, 4000);
 window.addEventListener('beforeunload', save);
 </script>
 </body>
