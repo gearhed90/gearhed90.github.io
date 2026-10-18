@@ -185,20 +185,83 @@ function spawnTerrainFeatures() {
   }
 }
 
+// Astronaut pioneer
 const pioneerGroup = new THREE.Group();
-const bodyMat = new THREE.MeshLambertMaterial({ color: 0xe8f0ff });
-const visorMat = new THREE.MeshLambertMaterial({ color: 0x7ee0ff });
-const body = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.32, 0.9, 6), bodyMat);
-body.position.y = 0.55;
-body.castShadow = true;
-pioneerGroup.add(body);
-const head = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.4, 0.45), bodyMat);
-head.position.y = 1.15;
-head.castShadow = true;
-pioneerGroup.add(head);
-const visor = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.22, 0.08), visorMat);
-visor.position.set(0, 1.15, 0.22);
+const suitMat = new THREE.MeshLambertMaterial({ color: 0xe8f0ff });
+const darkMat = new THREE.MeshLambertMaterial({ color: 0x4a5a70 });
+const visorMat = new THREE.MeshLambertMaterial({ color: 0x40c0ff });
+const accentMat = new THREE.MeshLambertMaterial({ color: 0xff7040 });
+const packMat = new THREE.MeshLambertMaterial({ color: 0x5a6a80 });
+
+// Legs
+const legL = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.42, 0.18), suitMat);
+legL.position.set(-0.12, 0.21, 0);
+legL.castShadow = true;
+pioneerGroup.add(legL);
+const legR = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.42, 0.18), suitMat);
+legR.position.set(0.12, 0.21, 0);
+legR.castShadow = true;
+pioneerGroup.add(legR);
+// Boots
+const bootL = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.1, 0.24), darkMat);
+bootL.position.set(-0.12, 0.05, 0.02);
+bootL.castShadow = true;
+pioneerGroup.add(bootL);
+const bootR = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.1, 0.24), darkMat);
+bootR.position.set(0.12, 0.05, 0.02);
+bootR.castShadow = true;
+pioneerGroup.add(bootR);
+
+// Torso
+const torso = new THREE.Mesh(new THREE.BoxGeometry(0.48, 0.5, 0.28), suitMat);
+torso.position.y = 0.67;
+torso.castShadow = true;
+pioneerGroup.add(torso);
+// Chest accent
+const chest = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.22, 0.04), accentMat);
+chest.position.set(0, 0.72, 0.15);
+pioneerGroup.add(chest);
+
+// Arms
+const armL = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.4, 0.12), suitMat);
+armL.position.set(-0.32, 0.65, 0);
+armL.castShadow = true;
+pioneerGroup.add(armL);
+const armR = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.4, 0.12), suitMat);
+armR.position.set(0.32, 0.65, 0);
+armR.castShadow = true;
+pioneerGroup.add(armR);
+// Gloves
+const gloveL = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.1, 0.14), darkMat);
+gloveL.position.set(-0.32, 0.42, 0);
+pioneerGroup.add(gloveL);
+const gloveR = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.1, 0.14), darkMat);
+gloveR.position.set(0.32, 0.42, 0);
+pioneerGroup.add(gloveR);
+
+// Helmet
+const helmet = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.38, 0.4), suitMat);
+helmet.position.y = 1.1;
+helmet.castShadow = true;
+pioneerGroup.add(helmet);
+// Visor
+const visor = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.2, 0.06), visorMat);
+visor.position.set(0, 1.12, 0.2);
 pioneerGroup.add(visor);
+// Helmet ring
+const ring = new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.06, 0.42), darkMat);
+ring.position.y = 0.92;
+pioneerGroup.add(ring);
+
+// Backpack
+const pack = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.38, 0.16), packMat);
+pack.position.set(0, 0.7, -0.2);
+pack.castShadow = true;
+pioneerGroup.add(pack);
+const packTop = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.08, 0.1), accentMat);
+packTop.position.set(0, 0.92, -0.18);
+pioneerGroup.add(packTop);
+
 scene.add(pioneerGroup);
 
 const matBase = new THREE.MeshLambertMaterial({ color: 0x4a7a9a });
