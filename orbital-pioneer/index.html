@@ -13,13 +13,19 @@ body { background: #0a0e17; color: #e8f0ff; font-family: system-ui, -apple-syste
 #resources { display: flex; gap: 12px; flex-wrap: wrap; }
 .res { display: flex; align-items: center; gap: 4px; font-size: 13px; }
 .res span { color: #a0c8ff; }
-#canvas { display: block; width: 100vw; height: 100vh; background: #12182a; }
 #buildPanel { position: fixed; bottom: 0; left: 0; right: 0; background: rgba(10,14,23,0.92); padding: 10px 8px; z-index: 10; display: flex; gap: 6px; overflow-x: auto; }
 .buildBtn { background: #1a2744; border: 1px solid #3a5a8a; color: #e8f0ff; padding: 8px 10px; border-radius: 8px; font-size: 12px; cursor: pointer; min-width: 90px; white-space: normal; text-align: center; line-height: 1.2; }
 .buildBtn:disabled { opacity: 0.45; }
 .buildBtn:active { background: #2a3f6a; }
 #log { position: fixed; top: 52px; left: 12px; font-size: 12px; color: #88aacc; pointer-events: none; max-width: 70%; }
 </style>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js"
+  }
+}
+</script>
 </head>
 <body>
 <div id="ui">
@@ -31,7 +37,6 @@ body { background: #0a0e17; color: #e8f0ff; font-family: system-ui, -apple-syste
     <div class="res">Aly: <span id="aly">0</span></div>
   </div>
 </div>
-<canvas id="canvas"></canvas>
 <div id="log"></div>
 <div id="buildPanel">
   <button class="buildBtn" id="btnExtractor" onclick="tryBuild('extractor')">Extractor<br>10 Reg</button>
@@ -39,45 +44,151 @@ body { background: #0a0e17; color: #e8f0ff; font-family: system-ui, -apple-syste
   <button class="buildBtn" id="btnFactory" onclick="tryBuild('factory')">Foundry<br>50R 20I 30P</button>
   <button class="buildBtn" id="btnLaunch" onclick="tryLaunch()">Launch</button>
 </div>
-<script>
-const canvas = document.getElementById('canvas');
-const ctx = canvas.getContext('2d');
-let W, H;
-function resize() { W = canvas.width = window.innerWidth; H = canvas.height = window.innerHeight; }
-window.addEventListener('resize', resize); resize();
+<script type="module">
+import * as THREE from 'three';
 
-const WORLD_W = 2400;
-const WORLD_H = 1600;
+const WORLD_SIZE = 40;
 const planets = [
-  { name: "Luna-1", color: "#c8d0e0", bg: "#1a2030", goal: { reg: 200, ice: 50 } },
-  { name: "Vesta Drift", color: "#e8c878", bg: "#2a2218", goal: { reg: 800, ice: 200, pwr: 100 } },
-  { name: "Ceres Hollow", color: "#a8c8ff", bg: "#182030", goal: { reg: 3000, ice: 800, aly: 50 } },
-  { name: "Europa Rift", color: "#88e8ff", bg: "#102028", goal: { reg: 12000, ice: 4000, aly: 300 } }
+  { name: "Luna-1", ground: 0xc8d0e0, sky: 0x1a2030, goal: { reg: 200, ice: 50 } },
+  { name: "Vesta Drift", ground: 0xe8c878, sky: 0x2a2218, goal: { reg: 800, ice: 200, pwr: 100 } },
+  { name: "Ceres Hollow", ground: 0xa8c8ff, sky: 0x182030, goal: { reg: 3000, ice: 800, aly: 50 } },
+  { name: "Europa Rift", ground: 0x88e8ff, sky: 0x102028, goal: { reg: 12000, ice: 4000, aly: 300 } }
 ];
 let planetIndex = 0;
 let resources = { reg: 20, ice: 0, pwr: 0, aly: 0 };
 let buildings = [];
 let nodes = [];
-let pioneer = { x: WORLD_W/2, y: WORLD_H/2, vx: 0, vy: 0 };
-let camera = { x: 0, y: 0 };
+let pioneer = { x: 0, z: 0, vx: 0, vz: 0 };
 let lastTime = performance.now();
 let logTimeout;
 
-// Invisible joystick state
+// Invisible joystick
 let joy = { active: false, startX: 0, startY: 0, id: null };
 const JOY_MAX = 70;
-const MOVE_SPEED = 260;
+const MOVE_SPEED = 6;
+
+// Three.js setup
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(planets[0].sky);
+scene.fog = new THREE.Fog(planets[0].sky, 12, 28);
+
+const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 100);
+camera.position.set(0, 12, 14);
+camera.lookAt(0, 0, 0);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+document.body.appendChild(renderer.domElement);
+
+// Lights
+const ambient = new THREE.AmbientLight(0xffffff, 0.55);
+scene.add(ambient);
+const dir = new THREE.DirectionalLight(0xffffff, 0.8);
+dir.position.set(8, 16, 6);
+dir.castShadow = true;
+scene.add(dir);
+
+// Ground
+const groundGeo = new THREE.PlaneGeometry(WORLD_SIZE, WORLD_SIZE, 8, 8);
+const groundMat = new THREE.MeshLambertMaterial({ color: planets[0].ground });
+const ground = new THREE.Mesh(groundGeo, groundMat);
+ground.rotation.x = -Math.PI / 2;
+ground.receiveShadow = true;
+scene.add(ground);
+
+// Low-poly pioneer
+const pioneerGroup = new THREE.Group();
+const bodyMat = new THREE.MeshLambertMaterial({ color: 0xe8f0ff });
+const visorMat = new THREE.MeshLambertMaterial({ color: 0x7ee0ff });
+const body = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.32, 0.9, 6), bodyMat);
+body.position.y = 0.55;
+body.castShadow = true;
+pioneerGroup.add(body);
+const head = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.4, 0.45), bodyMat);
+head.position.y = 1.15;
+head.castShadow = true;
+pioneerGroup.add(head);
+const visor = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.22, 0.08), visorMat);
+visor.position.set(0, 1.15, 0.22);
+pioneerGroup.add(visor);
+scene.add(pioneerGroup);
+
+// Materials for buildings and nodes
+const matExtractor = new THREE.MeshLambertMaterial({ color: 0x6a8aaa });
+const matSolar = new THREE.MeshLambertMaterial({ color: 0x7ee0ff });
+const matFactory = new THREE.MeshLambertMaterial({ color: 0x8a6a4a });
+const matReg = new THREE.MeshLambertMaterial({ color: 0xb8c4d0 });
+const matIce = new THREE.MeshLambertMaterial({ color: 0x88d0ff });
+
+function createExtractor() {
+  const g = new THREE.Group();
+  const base = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.5, 0.9), matExtractor);
+  base.position.y = 0.25;
+  base.castShadow = true;
+  g.add(base);
+  const tower = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.22, 0.7, 5), matExtractor);
+  tower.position.y = 0.75;
+  tower.castShadow = true;
+  g.add(tower);
+  return g;
+}
+function createSolar() {
+  const g = new THREE.Group();
+  const base = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.15, 0.8), matExtractor);
+  base.position.y = 0.08;
+  base.castShadow = true;
+  g.add(base);
+  const panel = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.08, 0.6), matSolar);
+  panel.position.y = 0.35;
+  panel.rotation.x = -0.4;
+  panel.castShadow = true;
+  g.add(panel);
+  return g;
+}
+function createFactory() {
+  const g = new THREE.Group();
+  const base = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.7, 1.0), matFactory);
+  base.position.y = 0.35;
+  base.castShadow = true;
+  g.add(base);
+  const chimney = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.15, 0.6, 5), matFactory);
+  chimney.position.set(0.2, 0.9, 0);
+  chimney.castShadow = true;
+  g.add(chimney);
+  return g;
+}
+function createNode(type) {
+  const geo = type === 'reg'
+    ? new THREE.DodecahedronGeometry(0.35, 0)
+    : new THREE.OctahedronGeometry(0.4, 0);
+  const mat = type === 'reg' ? matReg : matIce;
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.position.y = 0.35;
+  mesh.castShadow = true;
+  return mesh;
+}
 
 function spawnNodes() {
+  nodes.forEach(n => scene.remove(n.mesh));
   nodes = [];
-  for (let i = 0; i < 12; i++) {
-    nodes.push({
-      type: Math.random() < 0.6 ? 'reg' : 'ice',
-      x: Math.random() * (WORLD_W - 200) + 100,
-      y: Math.random() * (WORLD_H - 200) + 100,
-      amount: 8 + Math.random() * 12
-    });
+  for (let i = 0; i < 14; i++) {
+    const type = Math.random() < 0.6 ? 'reg' : 'ice';
+    const mesh = createNode(type);
+    const x = (Math.random() - 0.5) * (WORLD_SIZE - 6);
+    const z = (Math.random() - 0.5) * (WORLD_SIZE - 6);
+    mesh.position.set(x, 0.35, z);
+    scene.add(mesh);
+    nodes.push({ type, x, z, amount: 8 + Math.random() * 10, mesh });
   }
+}
+
+function updatePlanetVisuals() {
+  const p = planets[planetIndex];
+  scene.background = new THREE.Color(p.sky);
+  scene.fog.color.set(p.sky);
+  ground.material.color.set(p.ground);
 }
 
 function log(msg) {
@@ -102,44 +213,55 @@ function updateUI() {
   document.getElementById('btnLaunch').textContent = planetIndex >= planets.length - 1 ? "Final" : "Launch";
 }
 
-function tryBuild(type) {
+window.tryBuild = function(type) {
   const px = pioneer.x;
-  const py = pioneer.y;
+  const pz = pioneer.z;
+  let mesh;
   if (type === 'extractor' && resources.reg >= 10) {
     resources.reg -= 10;
-    buildings.push({ type: 'extractor', x: px + (Math.random()-0.5)*80, y: py + 40 });
+    mesh = createExtractor();
     log("Extractor built");
   } else if (type === 'solar' && resources.reg >= 20 && resources.ice >= 5) {
     resources.reg -= 20; resources.ice -= 5;
-    buildings.push({ type: 'solar', x: px + (Math.random()-0.5)*80, y: py + 40 });
+    mesh = createSolar();
     log("Solar array deployed");
   } else if (type === 'factory' && resources.reg >= 50 && resources.ice >= 20 && resources.pwr >= 30) {
     resources.reg -= 50; resources.ice -= 20; resources.pwr -= 30;
-    buildings.push({ type: 'factory', x: px + (Math.random()-0.5)*80, y: py + 40 });
+    mesh = createFactory();
     log("Foundry online");
   }
+  if (mesh) {
+    const ox = (Math.random() - 0.5) * 1.5;
+    const oz = 1.2 + Math.random() * 0.6;
+    mesh.position.set(px + ox, 0, pz + oz);
+    scene.add(mesh);
+    buildings.push({ type, mesh });
+  }
   updateUI();
-}
+};
 
-function tryLaunch() {
+window.tryLaunch = function() {
   if (planetIndex >= planets.length - 1) return;
   const g = planets[planetIndex].goal;
   if (resources.reg >= (g.reg||0) && resources.ice >= (g.ice||0) && resources.pwr >= (g.pwr||0) && resources.aly >= (g.aly||0)) {
     planetIndex++;
+    buildings.forEach(b => scene.remove(b.mesh));
     buildings = [];
-    pioneer.x = WORLD_W/2;
-    pioneer.y = WORLD_H/2;
+    pioneer.x = 0;
+    pioneer.z = 0;
     spawnNodes();
+    updatePlanetVisuals();
     log("Welcome to " + planets[planetIndex].name);
     updateUI();
   }
-}
+};
 
-function loop(now) {
+function animate(now) {
+  requestAnimationFrame(animate);
   const dt = Math.min((now - lastTime) / 1000, 0.1);
   lastTime = now;
 
-  // Idle production
+  // Production
   let extractors = buildings.filter(b => b.type === 'extractor').length;
   let solars = buildings.filter(b => b.type === 'solar').length;
   let factories = buildings.filter(b => b.type === 'factory').length;
@@ -152,103 +274,54 @@ function loop(now) {
     resources.ice -= factories * 0.08 * dt;
   }
 
-  // Collect nearby nodes
+  // Collect nodes
   nodes.forEach(n => {
     if (n.amount <= 0) return;
     const dx = pioneer.x - n.x;
-    const dy = pioneer.y - n.y;
-    if (Math.hypot(dx, dy) < 28) {
+    const dz = pioneer.z - n.z;
+    if (Math.hypot(dx, dz) < 0.8) {
       const take = Math.min(n.amount, 4 * dt);
       n.amount -= take;
       if (n.type === 'reg') resources.reg += take;
       else resources.ice += take;
+      n.mesh.scale.setScalar(0.4 + n.amount * 0.06);
     }
   });
-  nodes = nodes.filter(n => n.amount > 0.5);
+  nodes = nodes.filter(n => {
+    if (n.amount > 0.5) return true;
+    scene.remove(n.mesh);
+    return false;
+  });
 
-  // Pioneer movement (velocity set by joystick)
+  // Movement
   pioneer.x += pioneer.vx * dt;
-  pioneer.y += pioneer.vy * dt;
+  pioneer.z += pioneer.vz * dt;
   if (!joy.active) {
     pioneer.vx *= 0.85;
-    pioneer.vy *= 0.85;
+    pioneer.vz *= 0.85;
   }
-  pioneer.x = Math.max(30, Math.min(WORLD_W-30, pioneer.x));
-  pioneer.y = Math.max(30, Math.min(WORLD_H-30, pioneer.y));
+  const half = WORLD_SIZE / 2 - 1;
+  pioneer.x = Math.max(-half, Math.min(half, pioneer.x));
+  pioneer.z = Math.max(-half, Math.min(half, pioneer.z));
 
-  // Camera follows pioneer
-  camera.x = pioneer.x - W/2;
-  camera.y = pioneer.y - H/2;
-  camera.x = Math.max(0, Math.min(WORLD_W - W, camera.x));
-  camera.y = Math.max(0, Math.min(WORLD_H - H, camera.y));
-
-  // Draw
-  const p = planets[planetIndex];
-  ctx.fillStyle = p.bg;
-  ctx.fillRect(0, 0, W, H);
-
-  ctx.save();
-  ctx.translate(-camera.x, -camera.y);
-
-  // Ground patches
-  ctx.fillStyle = p.color;
-  ctx.globalAlpha = 0.12;
-  for (let i = 0; i < 40; i++) {
-    const gx = (i * 173) % WORLD_W;
-    const gy = (i * 251) % WORLD_H;
-    ctx.fillRect(gx, gy, 80 + (i%5)*20, 40 + (i%3)*15);
+  // Update pioneer mesh
+  pioneerGroup.position.set(pioneer.x, 0, pioneer.z);
+  if (Math.abs(pioneer.vx) + Math.abs(pioneer.vz) > 0.1) {
+    pioneerGroup.rotation.y = Math.atan2(pioneer.vx, pioneer.vz);
   }
-  ctx.globalAlpha = 1;
 
-  // Resource nodes
-  nodes.forEach(n => {
-    ctx.fillStyle = n.type === 'reg' ? '#b8c4d0' : '#88d0ff';
-    ctx.beginPath();
-    ctx.arc(n.x, n.y, 8, 0, Math.PI*2);
-    ctx.fill();
-    ctx.fillStyle = 'rgba(255,255,255,0.4)';
-    ctx.fillRect(n.x-6, n.y-14, Math.max(2, n.amount/2), 3);
-  });
-
-  // Buildings
-  buildings.forEach(b => {
-    ctx.save();
-    ctx.translate(b.x, b.y);
-    if (b.type === 'extractor') {
-      ctx.fillStyle = '#6a8aaa';
-      ctx.fillRect(-12, -18, 24, 18);
-      ctx.fillStyle = '#88aacc';
-      ctx.fillRect(-6, -26, 12, 10);
-    } else if (b.type === 'solar') {
-      ctx.fillStyle = '#3a5a8a';
-      ctx.fillRect(-16, -6, 32, 6);
-      ctx.fillStyle = '#7ee0ff';
-      ctx.fillRect(-14, -16, 28, 10);
-    } else if (b.type === 'factory') {
-      ctx.fillStyle = '#8a6a4a';
-      ctx.fillRect(-14, -20, 28, 20);
-      ctx.fillStyle = '#ffaa66';
-      ctx.fillRect(-3, -30, 6, 12);
-    }
-    ctx.restore();
-  });
-
-  // Pioneer
-  ctx.fillStyle = '#e8f0ff';
-  ctx.beginPath();
-  ctx.arc(pioneer.x, pioneer.y, 10, 0, Math.PI*2);
-  ctx.fill();
-  ctx.fillStyle = '#7ee0ff';
-  ctx.fillRect(pioneer.x-4, pioneer.y-16, 8, 8);
-
-  ctx.restore();
+  // Camera follow (isometric-ish)
+  const camX = pioneer.x + 0;
+  const camZ = pioneer.z + 10;
+  camera.position.lerp(new THREE.Vector3(camX, 11, camZ), 0.08);
+  camera.lookAt(pioneer.x, 0.5, pioneer.z);
 
   updateUI();
-  requestAnimationFrame(loop);
+  renderer.render(scene, camera);
 }
 
 function getTouchPos(e) {
-  const rect = canvas.getBoundingClientRect();
+  const rect = renderer.domElement.getBoundingClientRect();
   let clientX, clientY;
   if (e.touches && e.touches.length) {
     const t = Array.from(e.touches).find(t => t.identifier === joy.id) || e.touches[0];
@@ -258,14 +331,11 @@ function getTouchPos(e) {
     clientX = e.clientX;
     clientY = e.clientY;
   }
-  return {
-    x: clientX - rect.left,
-    y: clientY - rect.top
-  };
+  return { x: clientX - rect.left, y: clientY - rect.top };
 }
 
 function onDown(e) {
-  if (e.target !== canvas) return;
+  if (e.target.closest && e.target.closest('#buildPanel')) return;
   e.preventDefault();
   const pos = getTouchPos(e);
   joy.active = true;
@@ -273,7 +343,6 @@ function onDown(e) {
   joy.startY = pos.y;
   joy.id = e.touches ? e.touches[0].identifier : null;
 }
-
 function onMove(e) {
   if (!joy.active) return;
   e.preventDefault();
@@ -287,33 +356,34 @@ function onMove(e) {
   }
   const strength = Math.min(1, dist / JOY_MAX);
   pioneer.vx = (dx / JOY_MAX) * MOVE_SPEED * strength;
-  pioneer.vy = (dy / JOY_MAX) * MOVE_SPEED * strength;
+  pioneer.vz = (dy / JOY_MAX) * MOVE_SPEED * strength;
 }
+function onUp() { joy.active = false; joy.id = null; }
 
-function onUp(e) {
-  joy.active = false;
-  joy.id = null;
-}
+renderer.domElement.addEventListener('pointerdown', onDown);
+renderer.domElement.addEventListener('pointermove', onMove);
+renderer.domElement.addEventListener('pointerup', onUp);
+renderer.domElement.addEventListener('pointercancel', onUp);
+renderer.domElement.addEventListener('touchstart', onDown, { passive: false });
+renderer.domElement.addEventListener('touchmove', onMove, { passive: false });
+renderer.domElement.addEventListener('touchend', onUp);
+renderer.domElement.addEventListener('touchcancel', onUp);
 
-canvas.addEventListener('pointerdown', onDown);
-canvas.addEventListener('pointermove', onMove);
-canvas.addEventListener('pointerup', onUp);
-canvas.addEventListener('pointercancel', onUp);
-canvas.addEventListener('touchstart', onDown, { passive: false });
-canvas.addEventListener('touchmove', onMove, { passive: false });
-canvas.addEventListener('touchend', onUp);
-canvas.addEventListener('touchcancel', onUp);
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
 
 // Init
 spawnNodes();
 updateUI();
-requestAnimationFrame(loop);
+requestAnimationFrame(animate);
 
 function save() {
   localStorage.setItem('orbitalPioneer', JSON.stringify({
     resources, planetIndex,
-    buildings: buildings.map(b => ({type:b.type, x:b.x, y:b.y})),
-    pioneer: {x: pioneer.x, y: pioneer.y}
+    pioneer: { x: pioneer.x, z: pioneer.z }
   }));
 }
 function load() {
@@ -321,12 +391,12 @@ function load() {
     const d = JSON.parse(localStorage.getItem('orbitalPioneer') || '{}');
     if (d.resources) resources = d.resources;
     if (typeof d.planetIndex === 'number') planetIndex = d.planetIndex;
-    if (d.buildings) buildings = d.buildings;
-    if (d.pioneer) { pioneer.x = d.pioneer.x; pioneer.y = d.pioneer.y; }
+    if (d.pioneer) { pioneer.x = d.pioneer.x; pioneer.z = d.pioneer.z; }
+    updatePlanetVisuals();
   } catch(e) {}
 }
 load();
-if (!buildings.length && resources.reg < 5) resources.reg = 20;
+if (resources.reg < 5) resources.reg = 20;
 setInterval(save, 4000);
 window.addEventListener('beforeunload', save);
 </script>
