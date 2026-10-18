@@ -63,6 +63,7 @@ let pioneer = { x: 0, z: 0, vx: 0, vz: 0 };
 let lastTime = performance.now();
 let logTimeout;
 let terrainGroup = new THREE.Group();
+let walkTime = 0;
 
 let joy = { active: false, startX: 0, startY: 0, id: null };
 const JOY_MAX = 70;
@@ -185,7 +186,7 @@ function spawnTerrainFeatures() {
   }
 }
 
-// Astronaut pioneer
+// Astronaut with limb groups for animation
 const pioneerGroup = new THREE.Group();
 const suitMat = new THREE.MeshLambertMaterial({ color: 0xe8f0ff });
 const darkMat = new THREE.MeshLambertMaterial({ color: 0x4a5a70 });
@@ -193,62 +194,71 @@ const visorMat = new THREE.MeshLambertMaterial({ color: 0x40c0ff });
 const accentMat = new THREE.MeshLambertMaterial({ color: 0xff7040 });
 const packMat = new THREE.MeshLambertMaterial({ color: 0x5a6a80 });
 
-// Legs
+// Leg groups (pivot at hip)
+const legLGroup = new THREE.Group();
+legLGroup.position.set(-0.12, 0.42, 0);
+pioneerGroup.add(legLGroup);
 const legL = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.42, 0.18), suitMat);
-legL.position.set(-0.12, 0.21, 0);
+legL.position.y = -0.21;
 legL.castShadow = true;
-pioneerGroup.add(legL);
-const legR = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.42, 0.18), suitMat);
-legR.position.set(0.12, 0.21, 0);
-legR.castShadow = true;
-pioneerGroup.add(legR);
-// Boots
+legLGroup.add(legL);
 const bootL = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.1, 0.24), darkMat);
-bootL.position.set(-0.12, 0.05, 0.02);
+bootL.position.set(0, -0.37, 0.02);
 bootL.castShadow = true;
-pioneerGroup.add(bootL);
+legLGroup.add(bootL);
+
+const legRGroup = new THREE.Group();
+legRGroup.position.set(0.12, 0.42, 0);
+pioneerGroup.add(legRGroup);
+const legR = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.42, 0.18), suitMat);
+legR.position.y = -0.21;
+legR.castShadow = true;
+legRGroup.add(legR);
 const bootR = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.1, 0.24), darkMat);
-bootR.position.set(0.12, 0.05, 0.02);
+bootR.position.set(0, -0.37, 0.02);
 bootR.castShadow = true;
-pioneerGroup.add(bootR);
+legRGroup.add(bootR);
 
 // Torso
 const torso = new THREE.Mesh(new THREE.BoxGeometry(0.48, 0.5, 0.28), suitMat);
 torso.position.y = 0.67;
 torso.castShadow = true;
 pioneerGroup.add(torso);
-// Chest accent
 const chest = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.22, 0.04), accentMat);
 chest.position.set(0, 0.72, 0.15);
 pioneerGroup.add(chest);
 
-// Arms
+// Arm groups (pivot at shoulder)
+const armLGroup = new THREE.Group();
+armLGroup.position.set(-0.32, 0.85, 0);
+pioneerGroup.add(armLGroup);
 const armL = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.4, 0.12), suitMat);
-armL.position.set(-0.32, 0.65, 0);
+armL.position.y = -0.2;
 armL.castShadow = true;
-pioneerGroup.add(armL);
-const armR = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.4, 0.12), suitMat);
-armR.position.set(0.32, 0.65, 0);
-armR.castShadow = true;
-pioneerGroup.add(armR);
-// Gloves
+armLGroup.add(armL);
 const gloveL = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.1, 0.14), darkMat);
-gloveL.position.set(-0.32, 0.42, 0);
-pioneerGroup.add(gloveL);
+gloveL.position.y = -0.43;
+armLGroup.add(gloveL);
+
+const armRGroup = new THREE.Group();
+armRGroup.position.set(0.32, 0.85, 0);
+pioneerGroup.add(armRGroup);
+const armR = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.4, 0.12), suitMat);
+armR.position.y = -0.2;
+armR.castShadow = true;
+armRGroup.add(armR);
 const gloveR = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.1, 0.14), darkMat);
-gloveR.position.set(0.32, 0.42, 0);
-pioneerGroup.add(gloveR);
+gloveR.position.y = -0.43;
+armRGroup.add(gloveR);
 
 // Helmet
 const helmet = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.38, 0.4), suitMat);
 helmet.position.y = 1.1;
 helmet.castShadow = true;
 pioneerGroup.add(helmet);
-// Visor
 const visor = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.2, 0.06), visorMat);
 visor.position.set(0, 1.12, 0.2);
 pioneerGroup.add(visor);
-// Helmet ring
 const ring = new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.06, 0.42), darkMat);
 ring.position.y = 0.92;
 pioneerGroup.add(ring);
@@ -513,8 +523,21 @@ function animate(now) {
 
   const ph = getHeight(pioneer.x, pioneer.z);
   pioneerGroup.position.set(pioneer.x, ph, pioneer.z);
-  if (Math.abs(pioneer.vx) + Math.abs(pioneer.vz) > 0.1) {
+  const speed = Math.hypot(pioneer.vx, pioneer.vz);
+  if (speed > 0.1) {
     pioneerGroup.rotation.y = Math.atan2(pioneer.vx, pioneer.vz);
+    walkTime += dt * speed * 1.8;
+    const swing = Math.sin(walkTime) * 0.45;
+    legLGroup.rotation.x = swing;
+    legRGroup.rotation.x = -swing;
+    armLGroup.rotation.x = -swing * 0.7;
+    armRGroup.rotation.x = swing * 0.7;
+  } else {
+    // Ease limbs back to rest
+    legLGroup.rotation.x *= 0.85;
+    legRGroup.rotation.x *= 0.85;
+    armLGroup.rotation.x *= 0.85;
+    armRGroup.rotation.x *= 0.85;
   }
 
   lightTarget.position.set(pioneer.x, ph, pioneer.z);
