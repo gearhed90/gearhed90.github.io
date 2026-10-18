@@ -110,11 +110,9 @@ const lightTarget = new THREE.Object3D();
 scene.add(lightTarget);
 dir.target = lightTarget;
 
-function placeOnGround(obj, x, z, sink) {
-  const h = getHeight(x, z);
-  obj.position.set(x, h - (sink || 0), z);
-}
-
+// Ground is a PlaneGeometry (XY) rotated -PI/2 around X.
+// After rotation, local (x, y) becomes world (x, height, -y).
+// So height must be computed from the world Z the vertex will have.
 function createGround() {
   const geo = new THREE.PlaneGeometry(WORLD_SIZE, WORLD_SIZE, 64, 64);
   const pos = geo.attributes.position;
@@ -127,11 +125,13 @@ function createGround() {
   for (let i = 0; i < pos.count; i++) {
     const x = pos.getX(i);
     const y = pos.getY(i);
-    const h = getHeight(x, y);
+    // After rotation.x = -PI/2 this vertex is at world (x, h, -y)
+    const worldZ = -y;
+    const h = getHeight(x, worldZ);
     pos.setZ(i, h);
     const t = THREE.MathUtils.clamp((h + 1.6) / 3.2, 0, 1);
     let c = low.clone().lerp(high, t);
-    const noise = Math.sin(x * 0.22) * Math.cos(y * 0.18) * 0.5 + 0.5;
+    const noise = Math.sin(x * 0.22) * Math.cos(worldZ * 0.18) * 0.5 + 0.5;
     if (noise > 0.48) c.lerp(patch, (noise - 0.48) * 0.6);
     colors.push(c.r, c.g, c.b);
   }
@@ -146,6 +146,12 @@ function createGround() {
 let ground = createGround();
 scene.add(ground);
 scene.add(terrainGroup);
+
+function placeOnGround(obj, x, z, bottomY) {
+  // bottomY is the local Y of the object's bottom relative to its origin
+  const h = getHeight(x, z);
+  obj.position.set(x, h - bottomY, z);
+}
 
 function clearTerrain() {
   while (terrainGroup.children.length) {
@@ -171,7 +177,8 @@ function spawnTerrainFeatures() {
     rock.castShadow = true;
     rock.receiveShadow = true;
     terrainGroup.add(rock);
-    placeOnGround(rock, rx, rz, size * 0.15);
+    // Dodecahedron is centered; bottom is at -size
+    placeOnGround(rock, rx, rz, -size);
   }
 }
 
@@ -212,6 +219,7 @@ function createExtractor() {
   top.position.y = 1.05;
   top.castShadow = true;
   g.add(top);
+  g.userData.bottom = 0;
   return g;
 }
 function createSolar() {
@@ -228,6 +236,7 @@ function createSolar() {
   const stand = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.28, 0.08), matAccent);
   stand.position.y = 0.22;
   g.add(stand);
+  g.userData.bottom = 0;
   return g;
 }
 function createFactory() {
@@ -244,6 +253,7 @@ function createFactory() {
   chimney.position.set(0.25, 0.95, 0);
   chimney.castShadow = true;
   g.add(chimney);
+  g.userData.bottom = 0;
   return g;
 }
 function createNode(type) {
@@ -254,7 +264,7 @@ function createNode(type) {
   const mat = type === 'reg' ? matReg : matIce;
   const mesh = new THREE.Mesh(geo, mat);
   mesh.castShadow = true;
-  mesh.userData.sink = size * 0.2;
+  mesh.userData.bottom = -size;
   return mesh;
 }
 
@@ -267,7 +277,7 @@ function spawnNodes() {
     const x = (Math.random() - 0.5) * (WORLD_SIZE - 6);
     const z = (Math.random() - 0.5) * (WORLD_SIZE - 6);
     scene.add(mesh);
-    placeOnGround(mesh, x, z, mesh.userData.sink || 0);
+    placeOnGround(mesh, x, z, mesh.userData.bottom);
     nodes.push({ type, x, z, amount: 8 + Math.random() * 10, mesh });
   }
 }
@@ -289,10 +299,11 @@ function updatePlanetVisuals() {
   for (let i = 0; i < pos.count; i++) {
     const x = pos.getX(i);
     const y = pos.getY(i);
-    const h = getHeight(x, y);
+    const worldZ = -y;
+    const h = getHeight(x, worldZ);
     const t = THREE.MathUtils.clamp((h + 1.6) / 3.2, 0, 1);
     let c = low.clone().lerp(high, t);
-    const noise = Math.sin(x * 0.22) * Math.cos(y * 0.18) * 0.5 + 0.5;
+    const noise = Math.sin(x * 0.22) * Math.cos(worldZ * 0.18) * 0.5 + 0.5;
     if (noise > 0.48) c.lerp(patch, (noise - 0.48) * 0.6);
     colors.push(c.r, c.g, c.b);
   }
@@ -385,7 +396,7 @@ window.tryBuild = function(type) {
 
   if (mesh && costOk) {
     scene.add(mesh);
-    placeOnGround(mesh, spot.x, spot.z, 0);
+    placeOnGround(mesh, spot.x, spot.z, mesh.userData.bottom || 0);
     buildings.push({ type, mesh });
   }
   updateUI();
