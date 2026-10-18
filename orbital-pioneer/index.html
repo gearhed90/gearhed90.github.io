@@ -55,13 +55,18 @@ const planets = [
   { name: "Europa Rift", color: "#88e8ff", bg: "#102028", goal: { reg: 12000, ice: 4000, aly: 300 } }
 ];
 let planetIndex = 0;
-let resources = { reg: 20, ice: 0, pwr: 0, aly: 0 }; // start with enough for first extractor
+let resources = { reg: 20, ice: 0, pwr: 0, aly: 0 };
 let buildings = [];
 let nodes = [];
 let pioneer = { x: WORLD_W/2, y: WORLD_H/2, vx: 0, vy: 0 };
 let camera = { x: 0, y: 0 };
 let lastTime = performance.now();
 let logTimeout;
+
+// Invisible joystick state
+let joy = { active: false, startX: 0, startY: 0, id: null };
+const JOY_MAX = 70;
+const MOVE_SPEED = 260;
 
 function spawnNodes() {
   nodes = [];
@@ -161,11 +166,13 @@ function loop(now) {
   });
   nodes = nodes.filter(n => n.amount > 0.5);
 
-  // Pioneer movement
+  // Pioneer movement (velocity set by joystick)
   pioneer.x += pioneer.vx * dt;
   pioneer.y += pioneer.vy * dt;
-  pioneer.vx *= 0.94;
-  pioneer.vy *= 0.94;
+  if (!joy.active) {
+    pioneer.vx *= 0.85;
+    pioneer.vy *= 0.85;
+  }
   pioneer.x = Math.max(30, Math.min(WORLD_W-30, pioneer.x));
   pioneer.y = Math.max(30, Math.min(WORLD_H-30, pioneer.y));
 
@@ -240,22 +247,62 @@ function loop(now) {
   requestAnimationFrame(loop);
 }
 
-function handlePointer(e) {
-  e.preventDefault();
+function getTouchPos(e) {
   const rect = canvas.getBoundingClientRect();
-  const sx = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
-  const sy = (e.touches ? e.touches[0].clientY : e.clientY) - rect.top;
-  const wx = sx + camera.x;
-  const wy = sy + camera.y;
-  const dx = wx - pioneer.x;
-  const dy = wy - pioneer.y;
-  const dist = Math.hypot(dx, dy) || 1;
-  pioneer.vx = (dx / dist) * 220;
-  pioneer.vy = (dy / dist) * 220;
+  let clientX, clientY;
+  if (e.touches && e.touches.length) {
+    const t = Array.from(e.touches).find(t => t.identifier === joy.id) || e.touches[0];
+    clientX = t.clientX;
+    clientY = t.clientY;
+  } else {
+    clientX = e.clientX;
+    clientY = e.clientY;
+  }
+  return {
+    x: clientX - rect.left,
+    y: clientY - rect.top
+  };
 }
 
-canvas.addEventListener('pointerdown', handlePointer);
-canvas.addEventListener('touchstart', handlePointer, { passive: false });
+function onDown(e) {
+  if (e.target !== canvas) return;
+  e.preventDefault();
+  const pos = getTouchPos(e);
+  joy.active = true;
+  joy.startX = pos.x;
+  joy.startY = pos.y;
+  joy.id = e.touches ? e.touches[0].identifier : null;
+}
+
+function onMove(e) {
+  if (!joy.active) return;
+  e.preventDefault();
+  const pos = getTouchPos(e);
+  let dx = pos.x - joy.startX;
+  let dy = pos.y - joy.startY;
+  const dist = Math.hypot(dx, dy);
+  if (dist > JOY_MAX) {
+    dx = (dx / dist) * JOY_MAX;
+    dy = (dy / dist) * JOY_MAX;
+  }
+  const strength = Math.min(1, dist / JOY_MAX);
+  pioneer.vx = (dx / JOY_MAX) * MOVE_SPEED * strength;
+  pioneer.vy = (dy / JOY_MAX) * MOVE_SPEED * strength;
+}
+
+function onUp(e) {
+  joy.active = false;
+  joy.id = null;
+}
+
+canvas.addEventListener('pointerdown', onDown);
+canvas.addEventListener('pointermove', onMove);
+canvas.addEventListener('pointerup', onUp);
+canvas.addEventListener('pointercancel', onUp);
+canvas.addEventListener('touchstart', onDown, { passive: false });
+canvas.addEventListener('touchmove', onMove, { passive: false });
+canvas.addEventListener('touchend', onUp);
+canvas.addEventListener('touchcancel', onUp);
 
 // Init
 spawnNodes();
