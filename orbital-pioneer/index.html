@@ -88,10 +88,10 @@ renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 document.body.appendChild(renderer.domElement);
 
-const ambient = new THREE.AmbientLight(0xffffff, 0.22);
+const ambient = new THREE.AmbientLight(0xffffff, 0.12);
 scene.add(ambient);
-const dir = new THREE.DirectionalLight(0xffffff, 1.4);
-dir.position.set(5, 16, 2);
+const dir = new THREE.DirectionalLight(0xffffff, 1.6);
+dir.position.set(4, 14, 1);
 dir.castShadow = true;
 dir.shadow.mapSize.width = 2048;
 dir.shadow.mapSize.height = 2048;
@@ -101,7 +101,7 @@ dir.shadow.camera.left = -14;
 dir.shadow.camera.right = 14;
 dir.shadow.camera.top = 14;
 dir.shadow.camera.bottom = -14;
-dir.shadow.bias = -0.0008;
+dir.shadow.bias = -0.001;
 scene.add(dir);
 const lightTarget = new THREE.Object3D();
 scene.add(lightTarget);
@@ -112,7 +112,7 @@ const down = new THREE.Vector3(0, -1, 0);
 const rayOrigin = new THREE.Vector3();
 
 function sampleGroundY(x, z) {
-  rayOrigin.set(x, 20, z);
+  rayOrigin.set(x, 25, z);
   raycaster.set(rayOrigin, down);
   const hits = raycaster.intersectObject(ground);
   if (hits.length) return hits[0].point.y;
@@ -120,19 +120,19 @@ function sampleGroundY(x, z) {
 }
 
 function createGround() {
-  const geo = new THREE.PlaneGeometry(WORLD_SIZE, WORLD_SIZE, 56, 56);
+  const geo = new THREE.PlaneGeometry(WORLD_SIZE, WORLD_SIZE, 64, 64);
   const pos = geo.attributes.position;
   const colors = [];
   const base = new THREE.Color(planets[0].ground);
-  const low = base.clone().multiplyScalar(0.28);
-  const high = base.clone().lerp(new THREE.Color(0xffffff), 0.65);
+  const low = base.clone().multiplyScalar(0.15);
+  const high = base.clone().lerp(new THREE.Color(0xffffff), 0.8);
 
   for (let i = 0; i < pos.count; i++) {
     const x = pos.getX(i);
     const y = pos.getY(i);
     const h = getHeight(x, y);
     pos.setZ(i, h);
-    const t = THREE.MathUtils.clamp((h + 1.8) / 3.6, 0, 1);
+    const t = THREE.MathUtils.clamp((h + 2.0) / 4.0, 0, 1);
     const c = low.clone().lerp(high, t);
     colors.push(c.r, c.g, c.b);
   }
@@ -162,16 +162,16 @@ function spawnTerrainFeatures() {
   const p = planets[planetIndex];
   const rockMat = new THREE.MeshLambertMaterial({ color: p.rock });
 
-  for (let i = 0; i < 16; i++) {
-    const size = 0.32 + Math.random() * 0.5;
+  for (let i = 0; i < 14; i++) {
+    const size = 0.3 + Math.random() * 0.45;
     const geo = Math.random() < 0.5
       ? new THREE.DodecahedronGeometry(size, 0)
-      : new THREE.BoxGeometry(size * 1.1, size * 0.45, size * 0.8);
+      : new THREE.BoxGeometry(size * 1.05, size * 0.4, size * 0.75);
     const rock = new THREE.Mesh(geo, rockMat);
     const rx = (Math.random() - 0.5) * (WORLD_SIZE - 8);
     const rz = (Math.random() - 0.5) * (WORLD_SIZE - 8);
     const h = sampleGroundY(rx, rz);
-    rock.position.set(rx, h + size * 0.22, rz);
+    rock.position.set(rx, h + 0.02, rz);
     rock.rotation.y = Math.random() * Math.PI;
     rock.castShadow = true;
     rock.receiveShadow = true;
@@ -216,11 +216,11 @@ function createExtractor() {
 function createSolar() {
   const g = new THREE.Group();
   const base = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.15, 0.8), matExtractor);
-  base.position.y = 0.08;
+  base.position.y = 0.075;
   base.castShadow = true;
   g.add(base);
   const panel = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.08, 0.6), matSolar);
-  panel.position.y = 0.35;
+  panel.position.y = 0.32;
   panel.rotation.x = -0.4;
   panel.castShadow = true;
   g.add(panel);
@@ -257,7 +257,7 @@ function spawnNodes() {
     const x = (Math.random() - 0.5) * (WORLD_SIZE - 6);
     const z = (Math.random() - 0.5) * (WORLD_SIZE - 6);
     const h = sampleGroundY(x, z);
-    mesh.position.set(x, h + 0.28, z);
+    mesh.position.set(x, h + 0.12, z);
     scene.add(mesh);
     nodes.push({ type, x, z, amount: 8 + Math.random() * 10, mesh });
   }
@@ -274,13 +274,13 @@ function updatePlanetVisuals() {
   const pos = ground.geometry.attributes.position;
   const colors = [];
   const base = new THREE.Color(p.ground);
-  const low = base.clone().multiplyScalar(0.25);
-  const high = base.clone().lerp(new THREE.Color(0xffffff), 0.7);
+  const low = base.clone().multiplyScalar(0.12);
+  const high = base.clone().lerp(new THREE.Color(0xffffff), 0.85);
   for (let i = 0; i < pos.count; i++) {
     const x = pos.getX(i);
     const y = pos.getY(i);
     const h = getHeight(x, y);
-    const t = THREE.MathUtils.clamp((h + 1.8) / 3.6, 0, 1);
+    const t = THREE.MathUtils.clamp((h + 2.0) / 4.0, 0, 1);
     const c = low.clone().lerp(high, t);
     colors.push(c.r, c.g, c.b);
   }
@@ -373,7 +373,7 @@ window.tryBuild = function(type) {
 
   if (mesh && costOk) {
     const h = sampleGroundY(spot.x, spot.z);
-    mesh.position.set(spot.x, h + 0.02, spot.z);
+    mesh.position.set(spot.x, h, spot.z);
     scene.add(mesh);
     buildings.push({ type, mesh });
   }
@@ -442,13 +442,13 @@ function animate(now) {
   pioneer.z = Math.max(-half, Math.min(half, pioneer.z));
 
   const ph = sampleGroundY(pioneer.x, pioneer.z);
-  pioneerGroup.position.set(pioneer.x, ph + 0.04, pioneer.z);
+  pioneerGroup.position.set(pioneer.x, ph + 0.02, pioneer.z);
   if (Math.abs(pioneer.vx) + Math.abs(pioneer.vz) > 0.1) {
     pioneerGroup.rotation.y = Math.atan2(pioneer.vx, pioneer.vz);
   }
 
   lightTarget.position.set(pioneer.x, ph, pioneer.z);
-  dir.position.set(pioneer.x + 5, ph + 16, pioneer.z + 2);
+  dir.position.set(pioneer.x + 4, ph + 14, pioneer.z + 1);
   dir.shadow.camera.updateProjectionMatrix();
 
   const camX = pioneer.x;
