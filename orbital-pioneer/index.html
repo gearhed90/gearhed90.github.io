@@ -49,7 +49,6 @@ import * as THREE from 'three';
 
 const WORLD_SIZE = 40;
 const MIN_BUILD_DIST = 1.8;
-const PIONEER_LIFT = 0.18; // keeps feet above mesh surface
 const planets = [
   { name: "Luna-1", ground: 0xc8d0e0, sky: 0x1a2030, rock: 0xa0a8b0, goal: { reg: 200, ice: 50 } },
   { name: "Vesta Drift", ground: 0xe8c878, sky: 0x2a2218, rock: 0xc8a860, goal: { reg: 800, ice: 200, pwr: 100 } },
@@ -108,6 +107,18 @@ const lightTarget = new THREE.Object3D();
 scene.add(lightTarget);
 dir.target = lightTarget;
 
+const raycaster = new THREE.Raycaster();
+const down = new THREE.Vector3(0, -1, 0);
+const rayOrigin = new THREE.Vector3();
+
+function sampleGroundY(x, z) {
+  rayOrigin.set(x, 20, z);
+  raycaster.set(rayOrigin, down);
+  const hits = raycaster.intersectObject(ground);
+  if (hits.length) return hits[0].point.y;
+  return getHeight(x, z);
+}
+
 function createGround() {
   const geo = new THREE.PlaneGeometry(WORLD_SIZE, WORLD_SIZE, 56, 56);
   const pos = geo.attributes.position;
@@ -151,16 +162,16 @@ function spawnTerrainFeatures() {
   const p = planets[planetIndex];
   const rockMat = new THREE.MeshLambertMaterial({ color: p.rock });
 
-  for (let i = 0; i < 18; i++) {
-    const size = 0.35 + Math.random() * 0.6;
+  for (let i = 0; i < 16; i++) {
+    const size = 0.32 + Math.random() * 0.5;
     const geo = Math.random() < 0.5
       ? new THREE.DodecahedronGeometry(size, 0)
-      : new THREE.BoxGeometry(size * 1.15, size * 0.5, size * 0.85);
+      : new THREE.BoxGeometry(size * 1.1, size * 0.45, size * 0.8);
     const rock = new THREE.Mesh(geo, rockMat);
-    const rx = (Math.random() - 0.5) * (WORLD_SIZE - 7);
-    const rz = (Math.random() - 0.5) * (WORLD_SIZE - 7);
-    const h = getHeight(rx, rz);
-    rock.position.set(rx, h + size * 0.28 + 0.05, rz);
+    const rx = (Math.random() - 0.5) * (WORLD_SIZE - 8);
+    const rz = (Math.random() - 0.5) * (WORLD_SIZE - 8);
+    const h = sampleGroundY(rx, rz);
+    rock.position.set(rx, h + size * 0.22, rz);
     rock.rotation.y = Math.random() * Math.PI;
     rock.castShadow = true;
     rock.receiveShadow = true;
@@ -245,8 +256,8 @@ function spawnNodes() {
     const mesh = createNode(type);
     const x = (Math.random() - 0.5) * (WORLD_SIZE - 6);
     const z = (Math.random() - 0.5) * (WORLD_SIZE - 6);
-    const h = getHeight(x, z);
-    mesh.position.set(x, h + 0.35, z);
+    const h = sampleGroundY(x, z);
+    mesh.position.set(x, h + 0.28, z);
     scene.add(mesh);
     nodes.push({ type, x, z, amount: 8 + Math.random() * 10, mesh });
   }
@@ -361,8 +372,8 @@ window.tryBuild = function(type) {
   }
 
   if (mesh && costOk) {
-    const h = getHeight(spot.x, spot.z);
-    mesh.position.set(spot.x, h + 0.05, spot.z);
+    const h = sampleGroundY(spot.x, spot.z);
+    mesh.position.set(spot.x, h + 0.02, spot.z);
     scene.add(mesh);
     buildings.push({ type, mesh });
   }
@@ -430,8 +441,8 @@ function animate(now) {
   pioneer.x = Math.max(-half, Math.min(half, pioneer.x));
   pioneer.z = Math.max(-half, Math.min(half, pioneer.z));
 
-  const ph = getHeight(pioneer.x, pioneer.z);
-  pioneerGroup.position.set(pioneer.x, ph + PIONEER_LIFT, pioneer.z);
+  const ph = sampleGroundY(pioneer.x, pioneer.z);
+  pioneerGroup.position.set(pioneer.x, ph + 0.04, pioneer.z);
   if (Math.abs(pioneer.vx) + Math.abs(pioneer.vz) > 0.1) {
     pioneerGroup.rotation.y = Math.atan2(pioneer.vx, pioneer.vz);
   }
