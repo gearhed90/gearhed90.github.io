@@ -52,10 +52,10 @@ const MIN_BUILD_DIST = 1.8;
 const MAX_CARRY = 16;
 const CHUNK_VALUE = 4;
 const planets = [
-  { name: "Luna-1", ground: 0xe8f0ff, sky: 0x3a5070, rock: 0x9ab0c8, accent: 0xc8e0f8, goal: { reg: 200, ice: 50 } },
-  { name: "Vesta Drift", ground: 0xffd080, sky: 0x4a3820, rock: 0xe8b060, accent: 0xffc060, goal: { reg: 800, ice: 200, pwr: 100 } },
-  { name: "Ceres Hollow", ground: 0xb0e0ff, sky: 0x2a4060, rock: 0x70b0e0, accent: 0x90d0ff, goal: { reg: 3000, ice: 800, aly: 50 } },
-  { name: "Europa Rift", ground: 0x80f0ff, sky: 0x1c4050, rock: 0x60c0d8, accent: 0x70e0f0, goal: { reg: 12000, ice: 4000, aly: 300 } }
+  { name: "Luna-1", ground: 0xf0f8ff, sky: 0x6a8ab0, rock: 0xb0c8e0, accent: 0xd8f0ff, goal: { reg: 200, ice: 50 } },
+  { name: "Vesta Drift", ground: 0xffe0a0, sky: 0x7a6030, rock: 0xf0c080, accent: 0xffd080, goal: { reg: 800, ice: 200, pwr: 100 } },
+  { name: "Ceres Hollow", ground: 0xc0e8ff, sky: 0x4a7090, rock: 0x90c8f0, accent: 0xb0e0ff, goal: { reg: 3000, ice: 800, aly: 50 } },
+  { name: "Europa Rift", ground: 0xa0f8ff, sky: 0x3c7080, rock: 0x80d0e8, accent: 0x90f0ff, goal: { reg: 12000, ice: 4000, aly: 300 } }
 ];
 let planetIndex = 0;
 let resources = { reg: 20, ice: 0, pwr: 0, aly: 0 };
@@ -79,7 +79,7 @@ function getHeight(x, z) {
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(planets[0].sky);
-scene.fog = new THREE.Fog(planets[0].sky, 35, 90);
+scene.fog = new THREE.Fog(planets[0].sky, 45, 110);
 
 const camera = new THREE.PerspectiveCamera(58, window.innerWidth / window.innerHeight, 0.1, 150);
 camera.position.set(0, 14, 16);
@@ -91,12 +91,12 @@ renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.15;
+renderer.toneMappingExposure = 1.4;
 document.body.appendChild(renderer.domElement);
 
-const ambient = new THREE.AmbientLight(0xffffff, 0.85);
+const ambient = new THREE.AmbientLight(0xffffff, 1.3);
 scene.add(ambient);
-const dir = new THREE.DirectionalLight(0xfff8f0, 1.1);
+const dir = new THREE.DirectionalLight(0xffffff, 1.5);
 dir.position.set(10, 20, 8);
 dir.castShadow = true;
 dir.shadow.mapSize.width = 2048;
@@ -109,7 +109,7 @@ dir.shadow.camera.top = 22;
 dir.shadow.camera.bottom = -22;
 dir.shadow.bias = -0.0004;
 scene.add(dir);
-const fill = new THREE.DirectionalLight(0xd0e8ff, 0.45);
+const fill = new THREE.DirectionalLight(0xe0f0ff, 0.7);
 fill.position.set(-8, 10, -6);
 scene.add(fill);
 const lightTarget = new THREE.Object3D();
@@ -122,10 +122,10 @@ function createGround() {
   const colors = [];
   const p = planets[planetIndex];
   const base = new THREE.Color(p.ground);
-  const low = base.clone().multiplyScalar(0.85);
-  const high = base.clone().lerp(new THREE.Color(0xffffff), 0.3);
+  const low = base.clone().multiplyScalar(0.9);
+  const high = base.clone().lerp(new THREE.Color(0xffffff), 0.25);
   const patch1 = new THREE.Color(p.accent);
-  const patch2 = base.clone().lerp(new THREE.Color(0xaaaaaa), 0.25);
+  const patch2 = base.clone().lerp(new THREE.Color(0xcccccc), 0.2);
 
   for (let i = 0; i < pos.count; i++) {
     const x = pos.getX(i);
@@ -137,8 +137,8 @@ function createGround() {
     let c = low.clone().lerp(high, t);
     const n1 = Math.sin(x * 0.18) * Math.cos(worldZ * 0.15) * 0.5 + 0.5;
     const n2 = Math.sin(x * 0.07 + worldZ * 0.09) * 0.5 + 0.5;
-    if (n1 > 0.55) c.lerp(patch1, (n1 - 0.55) * 1.2);
-    if (n2 > 0.62) c.lerp(patch2, (n2 - 0.62) * 1.0);
+    if (n1 > 0.55) c.lerp(patch1, (n1 - 0.55) * 1.0);
+    if (n2 > 0.62) c.lerp(patch2, (n2 - 0.62) * 0.8);
     colors.push(c.r, c.g, c.b);
   }
   geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
@@ -172,18 +172,18 @@ function spawnTerrainFeatures() {
   const p = planets[planetIndex];
   const rockColors = [
     new THREE.Color(p.rock),
-    new THREE.Color(p.rock).multiplyScalar(0.8),
+    new THREE.Color(p.rock).multiplyScalar(0.85),
     new THREE.Color(p.accent)
   ];
   const crystalColors = [
-    new THREE.Color(0x80f0ff),
-    new THREE.Color(0xb0ffff),
-    new THREE.Color(0x60d0f0)
+    new THREE.Color(0xa0f8ff),
+    new THREE.Color(0xc0ffff),
+    new THREE.Color(0x80e8ff)
   ];
   const debrisColors = [
-    new THREE.Color(0x7a8a9a),
-    new THREE.Color(0xaa9a8a),
-    new THREE.Color(0x8a7a6a)
+    new THREE.Color(0x9aaab8),
+    new THREE.Color(0xc8b8a8),
+    new THREE.Color(0xa89888)
   ];
 
   for (let i = 0; i < 40; i++) {
@@ -247,11 +247,11 @@ function spawnTerrainFeatures() {
 }
 
 const pioneerGroup = new THREE.Group();
-const suitMat = new THREE.MeshLambertMaterial({ color: 0xf0f8ff });
-const darkMat = new THREE.MeshLambertMaterial({ color: 0x5a6a80 });
-const visorMat = new THREE.MeshLambertMaterial({ color: 0x50d0ff });
-const accentMat = new THREE.MeshLambertMaterial({ color: 0xff8050 });
-const packMat = new THREE.MeshLambertMaterial({ color: 0x6a7a90 });
+const suitMat = new THREE.MeshLambertMaterial({ color: 0xf8fcff });
+const darkMat = new THREE.MeshLambertMaterial({ color: 0x6a7a90 });
+const visorMat = new THREE.MeshLambertMaterial({ color: 0x60e0ff });
+const accentMat = new THREE.MeshLambertMaterial({ color: 0xff9060 });
+const packMat = new THREE.MeshLambertMaterial({ color: 0x7a8aa0 });
 
 const legLGroup = new THREE.Group();
 legLGroup.position.set(-0.12, 0.42, 0);
@@ -332,12 +332,12 @@ pioneerGroup.add(carryStack);
 
 scene.add(pioneerGroup);
 
-const matBase = new THREE.MeshLambertMaterial({ color: 0x5a8aaa });
-const matAccent = new THREE.MeshLambertMaterial({ color: 0x80d0f0 });
-const matSolarPanel = new THREE.MeshLambertMaterial({ color: 0x50e0ff });
-const matFactory = new THREE.MeshLambertMaterial({ color: 0xe0a070 });
-const matReg = new THREE.MeshLambertMaterial({ color: 0xf8fcff });
-const matIce = new THREE.MeshLambertMaterial({ color: 0x70e0ff });
+const matBase = new THREE.MeshLambertMaterial({ color: 0x6a9aba });
+const matAccent = new THREE.MeshLambertMaterial({ color: 0x90e0f8 });
+const matSolarPanel = new THREE.MeshLambertMaterial({ color: 0x60f0ff });
+const matFactory = new THREE.MeshLambertMaterial({ color: 0xf0b080 });
+const matReg = new THREE.MeshLambertMaterial({ color: 0xffffff });
+const matIce = new THREE.MeshLambertMaterial({ color: 0x80f0ff });
 
 function makeChunkMesh(type) {
   const geo = new THREE.BoxGeometry(0.14, 0.1, 0.14);
