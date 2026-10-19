@@ -52,10 +52,10 @@ const MIN_BUILD_DIST = 1.8;
 const MAX_CARRY = 16;
 const CHUNK_VALUE = 4;
 const planets = [
-  { name: "Luna-1", ground: 0xf0f8ff, sky: 0x6a8ab0, rock: 0xb0c8e0, accent: 0xd8f0ff, goal: { reg: 200, ice: 50 } },
-  { name: "Vesta Drift", ground: 0xffe0a0, sky: 0x7a6030, rock: 0xf0c080, accent: 0xffd080, goal: { reg: 800, ice: 200, pwr: 100 } },
-  { name: "Ceres Hollow", ground: 0xc0e8ff, sky: 0x4a7090, rock: 0x90c8f0, accent: 0xb0e0ff, goal: { reg: 3000, ice: 800, aly: 50 } },
-  { name: "Europa Rift", ground: 0xa0f8ff, sky: 0x3c7080, rock: 0x80d0e8, accent: 0x90f0ff, goal: { reg: 12000, ice: 4000, aly: 300 } }
+  { name: "Luna-1", ground: 0xb8c0c8, sky: 0x6a8ab0, rock: 0x8a949c, accent: 0xa0a8b0, goal: { reg: 200, ice: 50 } },
+  { name: "Vesta Drift", ground: 0xc8c0b0, sky: 0x7a6030, rock: 0xb0a898, accent: 0xd0c8b8, goal: { reg: 800, ice: 200, pwr: 100 } },
+  { name: "Ceres Hollow", ground: 0xb0c0c8, sky: 0x4a7090, rock: 0x90a0a8, accent: 0xa8b8c0, goal: { reg: 3000, ice: 800, aly: 50 } },
+  { name: "Europa Rift", ground: 0xa8b8c0, sky: 0x3c7080, rock: 0x88a0a8, accent: 0xa0b0b8, goal: { reg: 12000, ice: 4000, aly: 300 } }
 ];
 let planetIndex = 0;
 let resources = { reg: 20, ice: 0, pwr: 0, aly: 0 };
@@ -122,10 +122,10 @@ function createGround() {
   const colors = [];
   const p = planets[planetIndex];
   const base = new THREE.Color(p.ground);
-  const low = base.clone().multiplyScalar(0.9);
-  const high = base.clone().lerp(new THREE.Color(0xffffff), 0.25);
+  const low = base.clone().multiplyScalar(0.85);
+  const high = base.clone().lerp(new THREE.Color(0xd0d0d0), 0.3);
   const patch1 = new THREE.Color(p.accent);
-  const patch2 = base.clone().lerp(new THREE.Color(0xcccccc), 0.2);
+  const patch2 = new THREE.Color(0x909090);
 
   for (let i = 0; i < pos.count; i++) {
     const x = pos.getX(i);
@@ -137,8 +137,8 @@ function createGround() {
     let c = low.clone().lerp(high, t);
     const n1 = Math.sin(x * 0.18) * Math.cos(worldZ * 0.15) * 0.5 + 0.5;
     const n2 = Math.sin(x * 0.07 + worldZ * 0.09) * 0.5 + 0.5;
-    if (n1 > 0.55) c.lerp(patch1, (n1 - 0.55) * 1.0);
-    if (n2 > 0.62) c.lerp(patch2, (n2 - 0.62) * 0.8);
+    if (n1 > 0.6) c.lerp(patch1, (n1 - 0.6) * 0.6);
+    if (n2 > 0.65) c.lerp(patch2, (n2 - 0.65) * 0.7);
     colors.push(c.r, c.g, c.b);
   }
   geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
