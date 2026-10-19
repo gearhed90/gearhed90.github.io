@@ -47,7 +47,7 @@ body { background: #0a0e17; color: #e8f0ff; font-family: system-ui, -apple-syste
 <script type="module">
 import * as THREE from 'three';
 
-const WORLD_SIZE = 40;
+const WORLD_SIZE = 100;
 const MIN_BUILD_DIST = 1.8;
 const MAX_CARRY = 16;
 const CHUNK_VALUE = 4;
@@ -79,9 +79,9 @@ function getHeight(x, z) {
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(planets[0].sky);
-scene.fog = new THREE.Fog(planets[0].sky, 22, 42);
+scene.fog = new THREE.Fog(planets[0].sky, 28, 70);
 
-const camera = new THREE.PerspectiveCamera(58, window.innerWidth / window.innerHeight, 0.1, 100);
+const camera = new THREE.PerspectiveCamera(58, window.innerWidth / window.innerHeight, 0.1, 150);
 camera.position.set(0, 14, 16);
 camera.lookAt(0, 0, 0);
 
@@ -100,11 +100,11 @@ dir.castShadow = true;
 dir.shadow.mapSize.width = 2048;
 dir.shadow.mapSize.height = 2048;
 dir.shadow.camera.near = 0.5;
-dir.shadow.camera.far = 55;
-dir.shadow.camera.left = -18;
-dir.shadow.camera.right = 18;
-dir.shadow.camera.top = 18;
-dir.shadow.camera.bottom = -18;
+dir.shadow.camera.far = 80;
+dir.shadow.camera.left = -22;
+dir.shadow.camera.right = 22;
+dir.shadow.camera.top = 22;
+dir.shadow.camera.bottom = -22;
 dir.shadow.bias = -0.0004;
 scene.add(dir);
 const fill = new THREE.DirectionalLight(0xb0d0ff, 0.3);
@@ -115,7 +115,7 @@ scene.add(lightTarget);
 dir.target = lightTarget;
 
 function createGround() {
-  const geo = new THREE.PlaneGeometry(WORLD_SIZE, WORLD_SIZE, 64, 64);
+  const geo = new THREE.PlaneGeometry(WORLD_SIZE, WORLD_SIZE, 96, 96);
   const pos = geo.attributes.position;
   const colors = [];
   const p = planets[planetIndex];
@@ -184,14 +184,13 @@ function spawnTerrainFeatures() {
     new THREE.Color(0x6a5a4a)
   ];
 
-  // Small and medium rocks
-  for (let i = 0; i < 20; i++) {
+  for (let i = 0; i < 40; i++) {
     const size = 0.15 + Math.random() * 0.35;
     const geo = new THREE.DodecahedronGeometry(size, 0);
     const rockMat = new THREE.MeshLambertMaterial({ color: rockColors[i % rockColors.length] });
     const rock = new THREE.Mesh(geo, rockMat);
-    const rx = (Math.random() - 0.5) * (WORLD_SIZE - 8);
-    const rz = (Math.random() - 0.5) * (WORLD_SIZE - 8);
+    const rx = (Math.random() - 0.5) * (WORLD_SIZE - 12);
+    const rz = (Math.random() - 0.5) * (WORLD_SIZE - 12);
     rock.rotation.set(Math.random() * 0.4, Math.random() * Math.PI, Math.random() * 0.3);
     rock.castShadow = true;
     rock.receiveShadow = true;
@@ -199,14 +198,13 @@ function spawnTerrainFeatures() {
     placeOnGround(rock, rx, rz, -size * 0.6);
   }
 
-  // Larger boulders
-  for (let i = 0; i < 6; i++) {
+  for (let i = 0; i < 12; i++) {
     const size = 0.45 + Math.random() * 0.4;
     const geo = new THREE.DodecahedronGeometry(size, 0);
     const rockMat = new THREE.MeshLambertMaterial({ color: rockColors[i % rockColors.length] });
     const rock = new THREE.Mesh(geo, rockMat);
-    const rx = (Math.random() - 0.5) * (WORLD_SIZE - 12);
-    const rz = (Math.random() - 0.5) * (WORLD_SIZE - 12);
+    const rx = (Math.random() - 0.5) * (WORLD_SIZE - 16);
+    const rz = (Math.random() - 0.5) * (WORLD_SIZE - 16);
     rock.rotation.y = Math.random() * Math.PI;
     rock.scale.y = 0.7 + Math.random() * 0.4;
     rock.castShadow = true;
@@ -215,10 +213,9 @@ function spawnTerrainFeatures() {
     placeOnGround(rock, rx, rz, -size * 0.5);
   }
 
-  // Crystal clusters
-  for (let i = 0; i < 8; i++) {
-    const cx = (Math.random() - 0.5) * (WORLD_SIZE - 10);
-    const cz = (Math.random() - 0.5) * (WORLD_SIZE - 10);
+  for (let i = 0; i < 16; i++) {
+    const cx = (Math.random() - 0.5) * (WORLD_SIZE - 14);
+    const cz = (Math.random() - 0.5) * (WORLD_SIZE - 14);
     const count = 2 + Math.floor(Math.random() * 3);
     for (let j = 0; j < count; j++) {
       const h = 0.25 + Math.random() * 0.4;
@@ -234,13 +231,12 @@ function spawnTerrainFeatures() {
     }
   }
 
-  // Small debris / scrap
-  for (let i = 0; i < 10; i++) {
+  for (let i = 0; i < 20; i++) {
     const geo = new THREE.BoxGeometry(0.12 + Math.random() * 0.15, 0.06, 0.1 + Math.random() * 0.12);
     const mat = new THREE.MeshLambertMaterial({ color: debrisColors[i % debrisColors.length] });
     const debris = new THREE.Mesh(geo, mat);
-    const dx = (Math.random() - 0.5) * (WORLD_SIZE - 8);
-    const dz = (Math.random() - 0.5) * (WORLD_SIZE - 8);
+    const dx = (Math.random() - 0.5) * (WORLD_SIZE - 12);
+    const dz = (Math.random() - 0.5) * (WORLD_SIZE - 12);
     debris.rotation.y = Math.random() * Math.PI;
     debris.castShadow = true;
     terrainGroup.add(debris);
@@ -446,11 +442,11 @@ function createNode(type) {
 function spawnNodes() {
   nodes.forEach(n => scene.remove(n.mesh));
   nodes = [];
-  for (let i = 0; i < 14; i++) {
+  for (let i = 0; i < 28; i++) {
     const type = Math.random() < 0.6 ? 'reg' : 'ice';
     const mesh = createNode(type);
-    const x = (Math.random() - 0.5) * (WORLD_SIZE - 6);
-    const z = (Math.random() - 0.5) * (WORLD_SIZE - 6);
+    const x = (Math.random() - 0.5) * (WORLD_SIZE - 10);
+    const z = (Math.random() - 0.5) * (WORLD_SIZE - 10);
     scene.add(mesh);
     placeOnGround(mesh, x, z, mesh.userData.bottom);
     nodes.push({ type, x, z, amount: 20 + Math.random() * 24, mesh });
@@ -627,7 +623,7 @@ function animate(now) {
     pioneer.vx *= 0.85;
     pioneer.vz *= 0.85;
   }
-  const half = WORLD_SIZE / 2 - 1;
+  const half = WORLD_SIZE / 2 - 2;
   pioneer.x = Math.max(-half, Math.min(half, pioneer.x));
   pioneer.z = Math.max(-half, Math.min(half, pioneer.z));
 
